@@ -173,20 +173,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  const config = resolveTubingConfig(type || name || "", name);
-  if (config.renderType === "image" && config.imageUrl) {
-    const viewBox = config.viewBox || "0 0 300 220";
-    const parts = viewBox.split(/\s+/).map((v) => parseFloat(v));
-    const vbW = parts.length === 4 && !isNaN(parts[2]) ? parts[2] : 300;
-    const vbH = parts.length === 4 && !isNaN(parts[3]) ? parts[3] : 220;
-    return (
-      <svg viewBox={viewBox} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-        <image href={config.imageUrl} x="0" y="0" width={vbW} height={vbH} />
-      </svg>
-    );
-  }
-
-  // Anchor-seal / Ancrage
+  // 1. Anchor-seal / Ancrage
   if (t.includes("anchor") || t.includes("ancrage") || t.includes("seal") || n.includes("anchor") || n.includes("ancrage") || n.includes("seal")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -204,7 +191,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // Reduction / Cross-over
+  // 2. Reduction / Cross-over
   if (t.includes("reduction") || t.includes("cross-over") || t.includes("crossover") || t.includes("swage") || t.includes("réduction") || n.includes("reduction") || n.includes("cross-over") || n.includes("crossover") || n.includes("swage") || n.includes("réduction")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -226,7 +213,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 7. Tubing Court / Pup Joint / Joint court
+  // 3. Tubing Court / Pup Joint / Joint court
   if (t.includes("pup") || t.includes("court") || n.includes("pup") || n.includes("court") || n.includes("joint court") || n.includes("tubing court")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -246,7 +233,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 8. Reservoir Perforations
+  // 4. Reservoir Perforations
   if (t.includes("perforation") || t.includes("reservoir") || n.includes("perforation") || n.includes("reservoir")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -275,7 +262,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 9. Cement
+  // 5. Cement
   if (t.includes("cement") || t.includes("ciment") || n.includes("cement") || n.includes("ciment")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -303,7 +290,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 10. Casing
+  // 6. Casing
   if (t.includes("casing") || t.includes("cuvelage") || n.includes("casing") || n.includes("cuvelage")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -321,7 +308,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 11. Tubing
+  // 7. Tubing
   if (t.includes("tubing") || t.includes("colonne") || n.includes("tubing") || n.includes("colonne")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -338,7 +325,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 12. Borehole / Pocket / Foré
+  // 8. Borehole / Pocket / Foré
   if (t.includes("drilled") || t.includes("pocket") || t.includes("borehole") || t.includes("foré") || n.includes("drilled") || n.includes("pocket") || n.includes("borehole") || n.includes("foré")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -357,7 +344,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 13. Tailpipe / Tube de queue
+  // 9. Tailpipe / Tube de queue
   if (t.includes("tailpipe") || t.includes("queue") || n.includes("tailpipe") || n.includes("queue")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -376,6 +363,20 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
         <rect x="36" y="42" width="2" height="6" fill="#fbbf24" rx="0.5" />
         {/* Thread connection collar at the top */}
         <rect x="20" y="4" width="20" height="6" fill="#1e293b" stroke="#000000" strokeWidth="0.5" rx="0.5" />
+      </svg>
+    );
+  }
+
+  // 10. Fallback dynamic image matcher
+  const config = resolveTubingConfig(type || name || "", name);
+  if (config.renderType === "image" && config.imageUrl) {
+    const viewBox = config.viewBox || "0 0 300 220";
+    const parts = viewBox.split(/\s+/).map((v) => parseFloat(v));
+    const vbW = parts.length === 4 && !isNaN(parts[2]) ? parts[2] : 300;
+    const vbH = parts.length === 4 && !isNaN(parts[3]) ? parts[3] : 220;
+    return (
+      <svg viewBox={viewBox} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
+        <image href={config.imageUrl} x="0" y="0" width={vbW} height={vbH} />
       </svg>
     );
   }
