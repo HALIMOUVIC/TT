@@ -290,6 +290,31 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
+  // 6. Casing Shoe (Sabot) — must come BEFORE casing check
+  if (t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) {
+    return (
+      <svg viewBox="0 0 60 60" className="w-12 h-12">
+        {/* Casing pipe body */}
+        <rect x="20" y="4" width="20" height="38" fill="#64748b" stroke="#475569" strokeWidth="0.5" />
+        {/* Inner bore */}
+        <rect x="24" y="4" width="12" height="38" fill="#0f172a" />
+        {/* Shine highlight */}
+        <rect x="20" y="4" width="2" height="38" fill="#ffffff" opacity="0.25" />
+        {/* Shoe collar ring */}
+        <rect x="17" y="34" width="26" height="6" fill="#334155" stroke="#1e293b" strokeWidth="0.8" rx="0.5" />
+        {/* Left triangular shoe tip */}
+        <polygon points="20,40 12,56 20,56" fill="#000000" />
+        {/* Right triangular shoe tip */}
+        <polygon points="40,40 48,56 40,56" fill="#000000" />
+        {/* Bottom flat closure */}
+        <line x1="20" y1="56" x2="40" y2="56" stroke="#000000" strokeWidth="2" />
+        {/* Valve cross-mark on the shoe */}
+        <line x1="27" y1="44" x2="33" y2="50" stroke="#94a3b8" strokeWidth="1.2" />
+        <line x1="33" y1="44" x2="27" y2="50" stroke="#94a3b8" strokeWidth="1.2" />
+      </svg>
+    );
+  }
+
   // 6. Casing
   if (t.includes("casing") || t.includes("cuvelage") || n.includes("casing") || n.includes("cuvelage")) {
     return (
