@@ -38,7 +38,7 @@ function DonutChart({ slices, total }: { slices: { label: string; value: number;
       ))}
       {/* center white circle */}
       <circle cx={cx} cy={cy} r={r - 1} fill="white" />
-      <text x={cx} y={cy - 8} textAnchor="middle" fontSize="22" fontWeight="800" fill="#0f172a" fontFamily="'Syne',sans-serif">{total}</text>
+      <text x={cx} y={cy - 8} textAnchor="middle" fontSize="22" fontWeight="800" fill="#0f172a" fontFamily="'Inter',sans-serif">{total}</text>
       <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" fontWeight="600" fill="#94a3b8" fontFamily="'Inter',sans-serif" letterSpacing="1.5">PUITS</text>
     </svg>
   );
