@@ -1,0 +1,9 @@
+<svg viewBox="0 0 120 160" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#000" stroke-width="1">
+    <!-- Dark body block (schematic symbol convention) -->
+    <rect x="10" y="10" width="100" height="140" fill="#1a1a1a"/>
+
+    <!-- White bowtie / hourglass cutout representing the liner hanger symbol -->
+    <polygon points="30,25 90,25 30,135 90,135" fill="#ffffff" stroke="none"/>
+  </g>
+</svg>
