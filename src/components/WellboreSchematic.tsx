@@ -304,9 +304,9 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
         <rect x="18" y="4" width="4" height="42" fill="#64748b" />
         <rect x="38" y="4" width="4" height="42" fill="#64748b" />
         {/* Left shoe triangle — outward pointing (matches schematic polygon) */}
-        <polygon points="22,46 10,46 22,36" fill="#000000" />
+        <polygon points="22,46 10,46 22,36" fill="#f97316" />
         {/* Right shoe triangle — outward pointing (matches schematic polygon) */}
-        <polygon points="38,46 50,46 38,36" fill="#000000" />
+        <polygon points="38,46 50,46 38,36" fill="#f97316" />
       </svg>
     );
   }
