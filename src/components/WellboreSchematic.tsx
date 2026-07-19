@@ -294,19 +294,16 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
   if (t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
-        {/* Left casing wall */}
-        <line x1="22" y1="4" x2="22" y2="46" stroke="#334155" strokeWidth="2.5" />
-        {/* Right casing wall */}
-        <line x1="38" y1="4" x2="38" y2="46" stroke="#334155" strokeWidth="2.5" />
-        {/* Inner bore (dark) */}
-        <rect x="22" y="4" width="16" height="42" fill="#0f172a" />
-        {/* Casing steel walls over bore */}
+        {/* Inner bore (dark) — drawn first */}
+        <rect x="22" y="4" width="16" height="46" fill="#0f172a" />
+        {/* Left casing steel wall */}
         <rect x="18" y="4" width="4" height="42" fill="#64748b" />
+        {/* Right casing steel wall */}
         <rect x="38" y="4" width="4" height="42" fill="#64748b" />
-        {/* Left shoe triangle — outward pointing (matches schematic polygon) */}
-        <polygon points="22,46 10,46 22,36" fill="#f97316" />
-        {/* Right shoe triangle — outward pointing (matches schematic polygon) */}
-        <polygon points="38,46 50,46 38,36" fill="#f97316" />
+        {/* Left shoe triangle — orange, drawn LAST so it's on top */}
+        <polygon points="22,42 8,48 22,48" fill="#f97316" />
+        {/* Right shoe triangle — orange, drawn LAST so it's on top */}
+        <polygon points="38,42 52,48 38,48" fill="#f97316" />
       </svg>
     );
   }
