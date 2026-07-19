@@ -290,7 +290,13 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 6. Casing Shoe (Sabot) — must come BEFORE casing check
+  // 6a. Tubing Production Sabot (e.g. name contains "sabot" or "shoe" but does NOT contain "casing" or "cuvelage")
+  if ((t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) && 
+      !n.includes("casing") && !n.includes("cuvelage") && !n.includes("tubage") && !t.includes("casing")) {
+    return <img src="/img/sabot.svg" className="w-11 h-11 object-contain" alt="Sabot" />;
+  }
+
+  // 6b. Casing Shoe (Sabot) — contains "casing", "cuvelage", or "tubage" (renders orange triangles)
   if (t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">

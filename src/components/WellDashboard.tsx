@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { WellData } from "../types";
-import { Search, ListFilter, Droplet, Gauge, Activity, TrendingUp, MapPin } from "lucide-react";
+import { Search, ListFilter, MapPin } from "lucide-react";
 
 interface WellDashboardProps {
   wells: WellData[];
@@ -10,6 +10,26 @@ interface WellDashboardProps {
   onCreateNewWell: () => void;
   onDeleteWell?: (id: string) => void;
 }
+
+/* Cache-bust timestamp — re-evaluated on every server restart so
+   swapped SVG files in /img/ are always picked up fresh.            */
+const BUILD_TS = Date.now();
+
+/* Dynamic CSS filter to colorize any custom loaded SVG file to the exact card accent color */
+const getColorFilter = (color: string) => {
+  switch (color) {
+    case "#f97316": // Orange
+      return "brightness(0) saturate(100%) invert(51%) sepia(85%) saturate(2059%) hue-rotate(345deg) brightness(101%) contrast(97%)";
+    case "#3b82f6": // Blue
+      return "brightness(0) saturate(100%) invert(43%) sepia(93%) saturate(1415%) hue-rotate(203deg) brightness(98%) contrast(94%)";
+    case "#10b981": // Green
+      return "brightness(0) saturate(100%) invert(53%) sepia(91%) saturate(382%) hue-rotate(114deg) brightness(96%) contrast(89%)";
+    case "#8b5cf6": // Purple
+      return "brightness(0) saturate(100%) invert(39%) sepia(91%) saturate(2243%) hue-rotate(247deg) brightness(98%) contrast(94%)";
+    default:
+      return "none";
+  }
+};
 
 /* ── Donut Chart ─────────────────────────────────────────────── */
 function DonutChart({ slices, total }: { slices: { label: string; value: number; color: string }[]; total: number }) {
@@ -117,35 +137,71 @@ export default function WellDashboard({ wells, activeWellId, onSelectWell, onNav
       && (filterP === "ALL" || p === filterP);
   });
 
-  /* KPI cards */
+  /* KPI cards — imgSrc points to actual files in /public/img/
+     The BUILD_TS query param busts the browser cache on every
+     server restart so swapping a file always shows the new icon. */
   const kpis = [
-    { label: "Total Puits", value: String(total), sub: "dans le parc pétrolier", Icon: Droplet, accent: "#f97316", bg: "#fff7ed", border: "#fed7aa" },
-    { label: "Puits le Plus Profond", value: deepest.depth > 0 ? `${deepest.depth.toFixed(0)} m` : "—", sub: deepest.name, Icon: Gauge, accent: "#3b82f6", bg: "#eff6ff", border: "#bfdbfe" },
-    { label: "Profondeur Moyenne", value: avgD > 0 ? `${avgD.toFixed(0)} m` : "—", sub: "tous puits confondus", Icon: Activity, accent: "#10b981", bg: "#f0fdf4", border: "#a7f3d0" },
-    { label: "Réservoirs Actifs", value: String(Object.keys(resCnt).length), sub: "formations productrices", Icon: TrendingUp, accent: "#8b5cf6", bg: "#faf5ff", border: "#ddd6fe" },
+    {
+      label: "Total Puits",
+      value: String(total),
+      sub: "dans le parc pétrolier",
+      imgSrc: `/img/total_puits.svg?t=${BUILD_TS}`,
+      accent: "#f97316",
+      bg: "#fff7ed",
+      border: "#fed7aa",
+    },
+    {
+      label: "Puits le Plus Profond",
+      value: deepest.depth > 0 ? `${deepest.depth.toFixed(0)} m` : "—",
+      sub: deepest.name,
+      imgSrc: `/img/puits_profond.svg?t=${BUILD_TS}`,
+      accent: "#3b82f6",
+      bg: "#eff6ff",
+      border: "#bfdbfe",
+    },
+    {
+      label: "Réservoirs Actifs",
+      value: String(Object.keys(resCnt).length),
+      sub: "formations productrices",
+      imgSrc: `/img/reservoirs_actifs.svg?t=${BUILD_TS}`,
+      accent: "#8b5cf6",
+      bg: "#faf5ff",
+      border: "#ddd6fe",
+    },
   ];
 
   return (
     <div className="space-y-5" style={{ fontFamily: "'Inter',sans-serif" }} id="well_dashboard_root">
 
       {/* ══ KPI CARDS ══ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3" id="dashboard_stats_grid">
-        {kpis.map(({ label, value, sub, Icon, accent, bg, border }) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" id="dashboard_stats_grid">
+        {kpis.map(({ label, value, sub, imgSrc, accent, bg, border }) => (
           <div key={label}
-            className="rounded-2xl p-4 relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-default"
-            style={{ background: bg, border: `1.5px solid ${border}` }}>
-            {/* Faint icon watermark */}
-            <div className="absolute -right-3 -bottom-3 opacity-[0.07]">
-              <Icon style={{ width: 64, height: 64, color: accent }} />
+            className="rounded-2xl p-4 relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-default bg-white"
+            style={{ border: `1.5px solid ${border}` }}>
+
+            {/* Background tint overlay */}
+            <div className="absolute inset-0 opacity-[0.35]" style={{ backgroundColor: bg }}></div>
+
+            {/* Faint icon watermark bottom-right */}
+            <div className="absolute -right-2 -bottom-2 opacity-[0.12] select-none pointer-events-none w-16 h-16">
+              <img src={imgSrc} className="w-16 h-16 object-contain" style={{ filter: getColorFilter(accent) }} alt="" />
             </div>
-            <div className="mb-3">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: accent }}>
-                <Icon className="w-4 h-4 text-white" />
+
+            <div className="relative z-10">
+              {/* Icon badge */}
+              <div className="mb-3">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-white border border-slate-100 shadow-sm">
+                  <img src={imgSrc} className="w-6 h-6 object-contain" style={{ filter: getColorFilter(accent) }} alt="" />
+                </div>
               </div>
+              <p className="text-[9px] font-semibold uppercase tracking-widest mb-1 text-slate-500"
+                style={{ fontFamily: "'Inter',sans-serif", letterSpacing: "0.1em" }}>{label}</p>
+              <p className="text-2xl font-black leading-none mb-1"
+                style={{ fontFamily: "'Inter',sans-serif", color: accent }}>{value}</p>
+              <p className="text-[9px] text-slate-400 truncate font-medium"
+                style={{ fontFamily: "'Inter',sans-serif" }}>{sub}</p>
             </div>
-            <p className="text-[9px] font-semibold uppercase tracking-widest mb-1 text-slate-500" style={{ fontFamily: "'Inter',sans-serif", letterSpacing: "0.1em" }}>{label}</p>
-            <p className="text-2xl font-black leading-none text-slate-900 mb-1" style={{ fontFamily: "'Inter',sans-serif", color: accent }}>{value}</p>
-            <p className="text-[9px] text-slate-400 truncate font-medium" style={{ fontFamily: "'Inter',sans-serif" }}>{sub}</p>
           </div>
         ))}
       </div>

@@ -43,10 +43,17 @@ export default function CustomToolsModal({ onUpdated }: CustomToolsModalProps) {
   }, []);
 
   const handleSave = async (tool: Partial<CustomTool>) => {
-    if (!tool.type || !tool.default_name || !tool.french_designation) {
-      alert("Les champs Type, Nom et Désignation Française sont obligatoires.");
+    if (!tool.french_designation) {
+      alert("Le champ Désignation est obligatoire.");
       return;
     }
+    
+    // Ensure all three designation fields are aligned
+    const updatedTool = {
+      ...tool,
+      type: tool.french_designation,
+      default_name: tool.french_designation
+    };
     
     try {
       const isNew = !tool.id;
@@ -56,7 +63,7 @@ export default function CustomToolsModal({ onUpdated }: CustomToolsModalProps) {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tool)
+        body: JSON.stringify(updatedTool)
       });
       
       if (res.ok) {
@@ -142,9 +149,9 @@ export default function CustomToolsModal({ onUpdated }: CustomToolsModalProps) {
             <table className="w-full text-left text-xs text-slate-600">
               <thead className="bg-slate-100/80 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">ID Type (Système)</th>
-                  <th className="px-4 py-3">Désignation (FR)</th>
-                  <th className="px-4 py-3">Nom par défaut</th>
+                  <th className="px-4 py-3">Désignation</th>
+                  <th className="px-4 py-3">OD par défaut</th>
+                  <th className="px-4 py-3">Connexion par défaut</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -169,9 +176,9 @@ export default function CustomToolsModal({ onUpdated }: CustomToolsModalProps) {
                       </tr>
                     ) : (
                       <tr className="hover:bg-slate-50/50 group transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-800">{tool.type}</td>
-                        <td className="px-4 py-3">{tool.french_designation}</td>
-                        <td className="px-4 py-3">{tool.default_name}</td>
+                        <td className="px-4 py-3 font-medium text-slate-800">{tool.french_designation || tool.type}</td>
+                        <td className="px-4 py-3">{tool.default_od || "-"}</td>
+                        <td className="px-4 py-3">{tool.default_custom_type || "-"}</td>
                         <td className="px-4 py-3 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button onClick={() => startEdit(tool)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="Modifier">
                             <PenLine className="w-4 h-4" />
@@ -195,51 +202,25 @@ export default function CustomToolsModal({ onUpdated }: CustomToolsModalProps) {
 }
 
 function EditForm({ form, onChange, onCancel, onSave, isNew }: { form: Partial<CustomTool>, onChange: (f: Partial<CustomTool>) => void, onCancel: () => void, onSave: () => void, isNew?: boolean }) {
-  const handleTypeChange = (val: string) => {
-    if (isNew) {
-      onChange({
-        ...form,
-        type: val,
-        default_name: val,
-        french_designation: val,
-      });
-      return;
-    }
-    onChange({ ...form, type: val });
+  const handleDesignationChange = (val: string) => {
+    onChange({
+      ...form,
+      type: val,
+      french_designation: val,
+      default_name: val
+    });
   };
 
   return (
     <div className="p-3 border border-slate-200 rounded-md bg-white shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4">
       <div className="space-y-3">
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ID Type (Système) *</label>
-          <input
-            type="text"
-            className="w-full h-8 px-2 text-xs border border-slate-200 rounded"
-            value={form.type || ''}
-            onChange={e => handleTypeChange(e.target.value)}
-            placeholder="e.g. Anchor-seal"
-          />
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Désignation (FR) *</label>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Désignation *</label>
           <input
             type="text"
             className="w-full h-8 px-2 text-xs border border-slate-200 rounded"
             value={form.french_designation || ''}
-            onChange={e => onChange({ ...form, french_designation: e.target.value })}
-            placeholder="e.g. Anchor-seal"
-          />
-        </div>
-
-        <div>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Nom par défaut *</label>
-          <input
-            type="text"
-            className="w-full h-8 px-2 text-xs border border-slate-200 rounded"
-            value={form.default_name || ''}
-            onChange={e => onChange({ ...form, default_name: e.target.value })}
+            onChange={e => handleDesignationChange(e.target.value)}
             placeholder="e.g. Anchor-seal"
           />
         </div>
@@ -268,8 +249,8 @@ function EditForm({ form, onChange, onCancel, onSave, isNew }: { form: Partial<C
         </div>
       </div>
 
-      <div className="space-y-3 flex flex-col">
-        <div className="flex justify-end gap-2 pt-4 mt-auto">
+      <div className="space-y-3 flex flex-col justify-end">
+        <div className="flex justify-end gap-2 pt-4">
           <button onClick={onCancel} className="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 rounded hover:bg-slate-200 transition">Annuler</button>
           <button onClick={onSave} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-blue-600 rounded hover:bg-blue-700 transition">
             <Save className="w-3.5 h-3.5" />
