@@ -711,11 +711,8 @@ export default function App() {
         id="app_sidebar"
       >
         <div className="flex flex-col flex-1">
-          {/* Logo & Brand block (exactly like PORTAIL ENP) */}
           <div className="p-6 border-b border-slate-800/40 flex items-center gap-3 bg-[#0c1222]">
-            <div className="bg-[#f97316] p-2.5 rounded-lg text-white font-black flex items-center justify-center shadow-md">
-              <Droplet className="w-5.5 h-5.5 text-white" />
-            </div>
+            <img src="/logo.svg" className="w-9 h-9 object-contain rounded-lg shadow-md" alt="Logo" />
             <div>
               <h1 className="text-white font-extrabold tracking-wider text-sm font-sans uppercase">
                 Wellbore Pro

@@ -82,9 +82,7 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="absolute -top-[30%] -left-[10%] w-[70%] h-[70%] rounded-full bg-[#f97316] blur-[150px] opacity-30 pointer-events-none"></div>
 
           <div className="relative z-10 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#f97316] text-white flex items-center justify-center shadow-lg shadow-[#f97316]/20">
-              <Droplet className="w-5 h-5" />
-            </div>
+            <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
             <span className="text-xl font-black text-white tracking-tight">Wellbore Pro</span>
           </div>
 
@@ -105,11 +103,8 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Right Side - Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 xl:p-24 relative">
           <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl shadow-2xl space-y-10 border border-slate-100">
-          {/* Mobile Header (Hidden on Desktop) */}
           <div className="flex lg:hidden items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-[#f97316] text-white flex items-center justify-center shadow-lg shadow-[#f97316]/20">
-              <Droplet className="w-5 h-5" />
-            </div>
+            <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
             <span className="text-xl font-black text-slate-900 tracking-tight">Wellbore Pro</span>
           </div>
 
