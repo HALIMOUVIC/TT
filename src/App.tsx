@@ -720,9 +720,6 @@ export default function App() {
               <h1 className="text-white font-extrabold tracking-wider text-sm font-sans uppercase">
                 Wellbore Pro
               </h1>
-              <p className="text-[9px] text-slate-400 font-bold tracking-widest uppercase font-mono mt-0.5">
-                Wellbore Pro Studio
-              </p>
             </div>
           </div>
 
