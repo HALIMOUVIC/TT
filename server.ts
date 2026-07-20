@@ -790,27 +790,64 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         return res.status(401).json({ success: false, error: "Identifiants invalides" });
       }
 
-      const dbPassword = data.password ? data.password.toLowerCase().trim() : "";
       const inputPassword = password.trim();
-      const md5Hash = crypto.createHash("md5").update(inputPassword).digest("hex");
-      const sha1Hash = crypto.createHash("sha1").update(inputPassword).digest("hex");
-      const sha256Hash = crypto.createHash("sha256").update(inputPassword).digest("hex");
+      const storedPassword = data.password ? data.password.trim() : null;
 
-      const isValid =
-        data.password === inputPassword ||
-        data.password?.trim() === inputPassword ||
-        dbPassword === md5Hash ||
-        dbPassword === sha1Hash ||
-        dbPassword === sha256Hash;
+      // --- Password validation logic ---
+      let isValid = false;
+      let mustChangePassword = false;
+
+      if (!storedPassword) {
+        // No password set — allow login with matricule as first-time password
+        if (data.matricule && inputPassword === data.matricule.trim()) {
+          isValid = true;
+          mustChangePassword = true; // force password change after first login
+        }
+      } else {
+        // Normal check: plain text or hashed variants
+        const md5Hash = crypto.createHash("md5").update(inputPassword).digest("hex");
+        const sha1Hash = crypto.createHash("sha1").update(inputPassword).digest("hex");
+        const sha256Hash = crypto.createHash("sha256").update(inputPassword).digest("hex");
+
+        isValid =
+          storedPassword === inputPassword ||
+          storedPassword.toLowerCase() === md5Hash ||
+          storedPassword.toLowerCase() === sha1Hash ||
+          storedPassword.toLowerCase() === sha256Hash;
+      }
 
       if (!isValid) {
         return res.status(401).json({ success: false, error: "Mot de passe incorrect" });
       }
 
       const { password: _pw, ...safeUser } = data;
-      res.json({ success: true, user: safeUser });
+      res.json({ success: true, user: safeUser, must_change_password: mustChangePassword });
     } catch (error: any) {
       console.error("Login error:", error?.message || error);
+      res.status(500).json({ success: false, error: "Internal server error" });
+    }
+  });
+
+  // Change password endpoint — called after first login or when user wants to update
+  app.post("/api/auth/change-password", (req, res) => {
+    try {
+      const { employee_id, new_password } = req.body;
+      if (!employee_id || !new_password || new_password.trim().length < 4) {
+        return res.status(400).json({ success: false, error: "Données invalides" });
+      }
+
+      const db = getDb();
+      const result = db.prepare(
+        "UPDATE employees SET password = ? WHERE id = ?"
+      ).run(new_password.trim(), employee_id);
+
+      if (result.changes === 0) {
+        return res.status(404).json({ success: false, error: "Employé introuvable" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Change password error:", error?.message || error);
       res.status(500).json({ success: false, error: "Internal server error" });
     }
   });
