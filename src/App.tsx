@@ -781,45 +781,47 @@ export default function App() {
             </button>
           </div>
 
-          {/* Library Section (Bottom half of Sidebar) */}
-          <div className="px-4 py-4 border-t border-slate-800/40 space-y-2">
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
-              Bibliothèque
-            </p>
+          {/* Library Section (Bottom half of Sidebar) — Shown only for Admins */}
+          {isAdmin && (
+            <div className="px-4 py-4 border-t border-slate-800/40 space-y-2">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">
+                Bibliothèque
+              </p>
 
-            <button
-              id="sidebar_action_export"
-              onClick={exportWellJson}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all text-left"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Exporter Données</span>
-            </button>
+              <button
+                id="sidebar_action_export"
+                onClick={exportWellJson}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all text-left"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Exporter Données</span>
+              </button>
 
-            <label
-              htmlFor="import_json_input_sidebar"
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all text-left cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>Importer JSON</span>
-              <input
-                id="import_json_input_sidebar"
-                type="file"
-                accept=".json"
-                className="hidden"
-                onChange={handleImportJson}
-              />
-            </label>
+              <label
+                htmlFor="import_json_input_sidebar"
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-slate-400 hover:text-white hover:bg-slate-800/40 transition-all text-left cursor-pointer"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Importer JSON</span>
+                <input
+                  id="import_json_input_sidebar"
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={handleImportJson}
+                />
+              </label>
 
-            <button
-              id="sidebar_action_reset"
-              onClick={clearAllData}
-              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 transition-all text-left"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Réinitialiser</span>
-            </button>
-          </div>
+              <button
+                id="sidebar_action_reset"
+                onClick={clearAllData}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-[11px] font-bold rounded-md text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 transition-all text-left"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Réinitialiser</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Profile Container at Sidebar bottom (exactly like the picture!) */}

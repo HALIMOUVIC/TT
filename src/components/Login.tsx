@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Lock, User, Droplet, ArrowRight } from "lucide-react";
 
 interface LoginProps {
@@ -8,8 +8,19 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const [nomPrenom, setNomPrenom] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Load saved credentials if "remember me" was checked
+  useEffect(() => {
+    const isRemembered = localStorage.getItem("rememberMe") === "true";
+    if (isRemembered) {
+      setRememberMe(true);
+      setNomPrenom(localStorage.getItem("rememberedUser") || "");
+      setPassword(localStorage.getItem("rememberedPass") || "");
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,6 +36,15 @@ export default function Login({ onLogin }: LoginProps) {
 
       const data = await response.json();
       if (data.success && data.user) {
+        if (rememberMe) {
+          localStorage.setItem("rememberMe", "true");
+          localStorage.setItem("rememberedUser", nomPrenom);
+          localStorage.setItem("rememberedPass", password);
+        } else {
+          localStorage.removeItem("rememberMe");
+          localStorage.removeItem("rememberedUser");
+          localStorage.removeItem("rememberedPass");
+        }
         onLogin(data.user);
       } else {
         setError(data.error || "Échec de connexion");
@@ -41,7 +61,7 @@ export default function Login({ onLogin }: LoginProps) {
       className="min-h-screen flex font-sans bg-cover bg-center bg-no-repeat relative"
       style={{ backgroundImage: "url('https://lavoiedalgerie.dz/wp-content/uploads/2025/01/raffinage-sonatrach-800x500.jpeg')" }}
     >
-      {/* Dark Transparent Overlay for() the entire background */}
+      {/* Dark Transparent Overlay for the entire background */}
       <div className="absolute inset-0 bg-[#0c1222]/70 backdrop-blur-[2px]"></div>
 
       <div className="relative z-10 w-full flex flex-col lg:flex-row">
@@ -145,6 +165,19 @@ export default function Login({ onLogin }: LoginProps) {
                     required
                   />
                 </div>
+              </div>
+
+              {/* Remember Me Option */}
+              <div className="flex items-center justify-between pt-1">
+                <label className="flex items-center gap-2.5 text-xs text-slate-600 font-semibold cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#f97316] focus:ring-[#f97316] focus:ring-offset-0 cursor-pointer"
+                  />
+                  <span>Se souvenir de moi</span>
+                </label>
               </div>
             </div>
 
