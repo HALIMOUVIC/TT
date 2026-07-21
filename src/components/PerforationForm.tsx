@@ -12,9 +12,9 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
   // Perforation edit state
   const [editingPerfId, setEditingPerfId] = useState<string | null>(null);
   const [newPerf, setNewPerf] = useState<Partial<PerforationZone>>({
-    topDepth: 0,
-    bottomDepth: 0,
-    height: 0,
+    topDepth: undefined,
+    bottomDepth: undefined,
+    height: undefined,
     perfoType: '',
     diameter: '',
     density: undefined,
@@ -26,7 +26,16 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
   // We calculate height and shots on inputs' onChange now so that manual edits to the height field are preserved.
 
   const handleSavePerf = () => {
-    if (!newPerf.topDepth || !newPerf.bottomDepth) return;
+    if (
+      newPerf.topDepth === undefined ||
+      newPerf.bottomDepth === undefined ||
+      newPerf.topDepth === null ||
+      newPerf.bottomDepth === null ||
+      isNaN(newPerf.topDepth) ||
+      isNaN(newPerf.bottomDepth)
+    ) {
+      return;
+    }
 
     const updatedWell = savePerforation(well, newPerf, editingPerfId);
     onChange(updatedWell);
@@ -36,9 +45,9 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
     }
 
     setNewPerf({
-      topDepth: 0,
-      bottomDepth: 0,
-      height: 0,
+      topDepth: undefined,
+      bottomDepth: undefined,
+      height: undefined,
       perfoType: '',
       diameter: '',
       density: undefined,
@@ -73,7 +82,7 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
                 type="button"
                 onClick={() => {
                   setEditingPerfId(null);
-                  setNewPerf({ topDepth: 0, bottomDepth: 0, height: 0, perfoType: '', diameter: '', density: 0, calage: '', shots: 0, observations: '' });
+                  setNewPerf({ topDepth: undefined, bottomDepth: undefined, height: undefined, perfoType: '', diameter: '', density: undefined, calage: '', shots: undefined, observations: '' });
                 }}
                 className="text-[10px] text-slate-400 hover:text-slate-600 font-bold underline capitalize"
               >
@@ -94,16 +103,16 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
               step="0.01"
               placeholder="e.g. 1934.24"
               className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-rose-400 focus:ring-0 outline-none bg-white font-mono"
-              value={newPerf.topDepth || ''}
+              value={newPerf.topDepth !== undefined && newPerf.topDepth !== null ? newPerf.topDepth : ''}
               onChange={(e) => {
-                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
-                const bottom = newPerf.bottomDepth || 0;
-                const { height, shots } = calculatePerforationFields(val, bottom, undefined, newPerf.density);
+                const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                const bottom = newPerf.bottomDepth;
+                const { height, shots } = calculatePerforationFields(val || 0, bottom || 0, undefined, newPerf.density);
                 setNewPerf(prev => ({
                   ...prev,
                   topDepth: val,
-                  height: height,
-                  shots: shots
+                  height: val !== undefined && bottom !== undefined ? height : undefined,
+                  shots: val !== undefined && bottom !== undefined ? shots : undefined
                 }));
               }}
             />
@@ -117,16 +126,16 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
               step="0.01"
               placeholder="e.g. 1936.74"
               className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-rose-400 focus:ring-0 outline-none bg-white font-mono"
-              value={newPerf.bottomDepth || ''}
+              value={newPerf.bottomDepth !== undefined && newPerf.bottomDepth !== null ? newPerf.bottomDepth : ''}
               onChange={(e) => {
-                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
-                const top = newPerf.topDepth || 0;
-                const { height, shots } = calculatePerforationFields(top, val, undefined, newPerf.density);
+                const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+                const top = newPerf.topDepth;
+                const { height, shots } = calculatePerforationFields(top || 0, val || 0, undefined, newPerf.density);
                 setNewPerf(prev => ({
                   ...prev,
                   bottomDepth: val,
-                  height: height,
-                  shots: shots
+                  height: top !== undefined && val !== undefined ? height : undefined,
+                  shots: top !== undefined && val !== undefined ? shots : undefined
                 }));
               }}
             />
@@ -140,9 +149,9 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
               step="0.01"
               placeholder="e.g. 3.5"
               className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-rose-400 focus:ring-0 outline-none bg-white font-mono text-slate-800 font-bold"
-              value={newPerf.height || ''}
+              value={newPerf.height !== undefined && newPerf.height !== null ? newPerf.height : ''}
               onChange={(e) => {
-                const val = e.target.value === '' ? 0 : parseFloat(e.target.value) || 0;
+                const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
                 const { shots } = calculatePerforationFields(0, 0, val, newPerf.density);
                 setNewPerf(prev => ({
                   ...prev,
@@ -184,7 +193,7 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
               type="number"
               placeholder="e.g. 13"
               className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-rose-400 focus:ring-0 outline-none bg-white font-mono"
-              value={newPerf.density !== undefined ? newPerf.density : ''}
+              value={newPerf.density !== undefined && newPerf.density !== null ? newPerf.density : ''}
               onChange={(e) => {
                 const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
                 const { shots } = calculatePerforationFields(0, 0, newPerf.height, val);
@@ -217,7 +226,7 @@ export default function PerforationForm({ well, onChange }: PerforationFormProps
               step="0.01"
               placeholder="Calculated"
               className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-rose-400 focus:ring-0 outline-none bg-white font-mono text-rose-700 font-bold"
-              value={newPerf.shots !== undefined ? newPerf.shots : ''}
+              value={newPerf.shots !== undefined && newPerf.shots !== null ? newPerf.shots : ''}
               onChange={(e) => {
                 const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
                 setNewPerf(prev => ({ ...prev, shots: val }));
