@@ -82,14 +82,22 @@ export function calculateMaxDepth(well: WellData) {
 
 export function recalculateBottomDepths(tubings: TubingComponent[]) {
   if (wasmModule) {
-    return JSON.parse(wasmModule.wasm_recalculate_bottom_depths(JSON.stringify(tubings)));
+    try {
+      return JSON.parse(wasmModule.wasm_recalculate_bottom_depths(JSON.stringify(tubings)));
+    } catch (e) {
+      console.warn("WASM recalculateBottomDepths failed, falling back to TS:", e);
+    }
   }
   return tsCore.recalculateBottomDepths(tubings);
 }
 
 export function calculateCoteProducts(tubings: TubingComponent[], spoolProd?: string) {
   if (wasmModule) {
-    return JSON.parse(wasmModule.wasm_calculate_cote_products(JSON.stringify(tubings), spoolProd || ''));
+    try {
+      return JSON.parse(wasmModule.wasm_calculate_cote_products(JSON.stringify(tubings), spoolProd || ''));
+    } catch (e) {
+      console.warn("WASM calculateCoteProducts failed, falling back to TS:", e);
+    }
   }
   return tsCore.calculateCoteProducts(tubings, spoolProd);
 }
@@ -102,38 +110,50 @@ export function calculatePerforationFields(
   manualShots?: number
 ) {
   if (wasmModule) {
-    return JSON.parse(
-      wasmModule.wasm_calculate_perforation_fields(
-        top,
-        bottom,
-        manualHeight ?? 0,
-        density ?? 0,
-        manualShots ?? 0,
-        manualHeight !== undefined && manualHeight !== null,
-        density !== undefined,
-        manualShots !== undefined
-      )
-    );
+    try {
+      return JSON.parse(
+        wasmModule.wasm_calculate_perforation_fields(
+          top,
+          bottom,
+          manualHeight ?? 0,
+          density ?? 0,
+          manualShots ?? 0,
+          manualHeight !== undefined && manualHeight !== null,
+          density !== undefined,
+          manualShots !== undefined
+        )
+      );
+    } catch (e) {
+      console.warn("WASM calculatePerforationFields failed, falling back to TS:", e);
+    }
   }
   return tsCore.calculatePerforationFields(top, bottom, manualHeight, density, manualShots);
 }
 
 export function savePerforation(well: WellData, newPerf: Partial<PerforationZone>, editingPerfId: string | null) {
   if (wasmModule) {
-    return JSON.parse(
-      wasmModule.wasm_save_perforation(
-        JSON.stringify(well),
-        JSON.stringify(newPerf),
-        editingPerfId || ''
-      )
-    );
+    try {
+      return JSON.parse(
+        wasmModule.wasm_save_perforation(
+          JSON.stringify(well),
+          JSON.stringify(newPerf),
+          editingPerfId || ''
+        )
+      );
+    } catch (e) {
+      console.warn("WASM savePerforation failed, falling back to TS:", e);
+    }
   }
   return tsCore.savePerforation(well, newPerf, editingPerfId);
 }
 
 export function removePerforationFromWell(well: WellData, id: string) {
   if (wasmModule) {
-    return JSON.parse(wasmModule.wasm_remove_perforation(JSON.stringify(well), id));
+    try {
+      return JSON.parse(wasmModule.wasm_remove_perforation(JSON.stringify(well), id));
+    } catch (e) {
+      console.warn("WASM removePerforationFromWell failed, falling back to TS:", e);
+    }
   }
   return tsCore.removePerforationFromWell(well, id);
 }
