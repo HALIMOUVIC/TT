@@ -1014,7 +1014,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                                 x={xCenter - Math.max(boreholeR, prevCasingR)}
                                 y={yTOC}
                                 width={Math.max(boreholeR, prevCasingR) - casingR}
-                                height={prevShoeY - yTOC}
+                                height={Math.max(0, prevShoeY - yTOC)}
                                 fill="url(#cement-pattern)"
                                 className="transition-colors group-hover:fill-slate-200"
                               />
@@ -1025,20 +1025,22 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                                 x={xCenter - Math.max(boreholeR, prevBoreholeR)}
                                 y={Math.max(yTOC, prevShoeY)}
                                 width={Math.max(boreholeR, prevBoreholeR) - casingR}
-                                height={prevDrilledY - Math.max(yTOC, prevShoeY)}
+                                height={Math.max(0, prevDrilledY - Math.max(yTOC, prevShoeY))}
                                 fill="url(#cement-pattern)"
                                 className="transition-colors group-hover:fill-slate-200"
                               />
                             )}
                             {/* Left Cement Column (Lower part inside current borehole) */}
-                            <rect
-                              x={xCenter - boreholeR}
-                              y={Math.max(yTOC, prevDrilledY)}
-                              width={boreholeR - casingR}
-                              height={yShoe - Math.max(yTOC, prevDrilledY)}
-                              fill="url(#cement-pattern)"
-                              className="transition-colors group-hover:fill-slate-200"
-                            />
+                            {yShoe > Math.max(yTOC, prevDrilledY) && (
+                              <rect
+                                x={xCenter - boreholeR}
+                                y={Math.max(yTOC, prevDrilledY)}
+                                width={boreholeR - casingR}
+                                height={yShoe - Math.max(yTOC, prevDrilledY)}
+                                fill="url(#cement-pattern)"
+                                className="transition-colors group-hover:fill-slate-200"
+                              />
+                            )}
                             
                             {/* Right Cement Column (Upper part inside previous casing) */}
                             {yTOC < prevShoeY && (
@@ -1046,7 +1048,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                                 x={xCenter + casingR}
                                 y={yTOC}
                                 width={Math.max(boreholeR, prevCasingR) - casingR}
-                                height={prevShoeY - yTOC}
+                                height={Math.max(0, prevShoeY - yTOC)}
                                 fill="url(#cement-pattern)"
                                 className="transition-colors group-hover:fill-slate-200"
                               />
@@ -1057,20 +1059,22 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                                 x={xCenter + casingR}
                                 y={Math.max(yTOC, prevShoeY)}
                                 width={Math.max(boreholeR, prevBoreholeR) - casingR}
-                                height={prevDrilledY - Math.max(yTOC, prevShoeY)}
+                                height={Math.max(0, prevDrilledY - Math.max(yTOC, prevShoeY))}
                                 fill="url(#cement-pattern)"
                                 className="transition-colors group-hover:fill-slate-200"
                               />
                             )}
                             {/* Right Cement Column (Lower part inside current borehole) */}
-                            <rect
-                              x={xCenter + casingR}
-                              y={Math.max(yTOC, prevDrilledY)}
-                              width={boreholeR - casingR}
-                              height={yShoe - Math.max(yTOC, prevDrilledY)}
-                              fill="url(#cement-pattern)"
-                              className="transition-colors group-hover:fill-slate-200"
-                            />
+                            {yShoe > Math.max(yTOC, prevDrilledY) && (
+                              <rect
+                                x={xCenter + casingR}
+                                y={Math.max(yTOC, prevDrilledY)}
+                                width={boreholeR - casingR}
+                                height={yShoe - Math.max(yTOC, prevDrilledY)}
+                                fill="url(#cement-pattern)"
+                                className="transition-colors group-hover:fill-slate-200"
+                              />
+                            )}
                           </g>
                         )}
 
@@ -1245,7 +1249,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
           {layout.perforation && well.perforations.length > 0 && (() => {
             const perfo = well.perforations[0];
             const { yTop, yBottom, topDepth, bottomDepth, shotRows: rows } = layout.perforation!;
-            const height = yBottom - yTop;
+            const height = Math.max(0, yBottom - yTop);
 
             return (
               <g
@@ -1445,7 +1449,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
           {computedTools.map((tool, toolIdx) => {
             const yTop = tool.visualYTop ?? (tool as { visual_y_top?: number }).visual_y_top ?? 0;
             const yBottom = tool.visualYBottom ?? (tool as { visual_y_bottom?: number }).visual_y_bottom ?? yTop;
-            const height = tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop);
+            const height = Math.max(0, tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop));
             const effectiveType = tool.effectiveType;
 
             // Dynamically calculate the active inner casing radius at this tool's depth

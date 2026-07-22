@@ -1059,25 +1059,29 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                                 <>
                                   {/* Left Cement Column (Upper part inside previous casing) */}
                                   {yTOC < prevShoeY && (
-                                    <rect x={xCenter - Math.max(holeR, prevCsgR)} y={yTOC} width={Math.max(holeR, prevCsgR) - csgR} height={prevShoeY - yTOC} fill="url(#slurry-diagonal)" />
+                                    <rect x={xCenter - Math.max(holeR, prevCsgR)} y={yTOC} width={Math.max(holeR, prevCsgR) - csgR} height={Math.max(0, prevShoeY - yTOC)} fill="url(#slurry-diagonal)" />
                                   )}
                                   {/* Left Cement Column (Middle part inside previous borehole pocket) */}
                                   {yTOC < prevDrilledY && prevDrilledY > prevShoeY && (
-                                    <rect x={xCenter - Math.max(holeR, prevHoleR)} y={Math.max(yTOC, prevShoeY)} width={Math.max(holeR, prevHoleR) - csgR} height={prevDrilledY - Math.max(yTOC, prevShoeY)} fill="url(#slurry-diagonal)" />
+                                    <rect x={xCenter - Math.max(holeR, prevHoleR)} y={Math.max(yTOC, prevShoeY)} width={Math.max(holeR, prevHoleR) - csgR} height={Math.max(0, prevDrilledY - Math.max(yTOC, prevShoeY))} fill="url(#slurry-diagonal)" />
                                   )}
                                   {/* Left Cement Column (Lower part inside current borehole) */}
-                                  <rect x={xCenter - holeR} y={Math.max(yTOC, prevDrilledY)} width={holeR - csgR} height={yShoe - Math.max(yTOC, prevDrilledY)} fill="url(#slurry-diagonal)" />
+                                  {yShoe > Math.max(yTOC, prevDrilledY) && (
+                                    <rect x={xCenter - holeR} y={Math.max(yTOC, prevDrilledY)} width={holeR - csgR} height={yShoe - Math.max(yTOC, prevDrilledY)} fill="url(#slurry-diagonal)" />
+                                  )}
                                   
                                   {/* Right Cement Column (Upper part inside previous casing) */}
                                   {yTOC < prevShoeY && (
-                                    <rect x={xCenter + csgR} y={yTOC} width={Math.max(holeR, prevCsgR) - csgR} height={prevShoeY - yTOC} fill="url(#slurry-diagonal)" />
+                                    <rect x={xCenter + csgR} y={yTOC} width={Math.max(holeR, prevCsgR) - csgR} height={Math.max(0, prevShoeY - yTOC)} fill="url(#slurry-diagonal)" />
                                   )}
                                   {/* Right Cement Column (Middle part inside previous borehole pocket) */}
                                   {yTOC < prevDrilledY && prevDrilledY > prevShoeY && (
-                                    <rect x={xCenter + csgR} y={Math.max(yTOC, prevShoeY)} width={Math.max(holeR, prevHoleR) - csgR} height={prevDrilledY - Math.max(yTOC, prevShoeY)} fill="url(#slurry-diagonal)" />
+                                    <rect x={xCenter + csgR} y={Math.max(yTOC, prevShoeY)} width={Math.max(holeR, prevHoleR) - csgR} height={Math.max(0, prevDrilledY - Math.max(yTOC, prevShoeY))} fill="url(#slurry-diagonal)" />
                                   )}
                                   {/* Right Cement Column (Lower part inside current borehole) */}
-                                  <rect x={xCenter + csgR} y={Math.max(yTOC, prevDrilledY)} width={holeR - csgR} height={yShoe - Math.max(yTOC, prevDrilledY)} fill="url(#slurry-diagonal)" />
+                                  {yShoe > Math.max(yTOC, prevDrilledY) && (
+                                    <rect x={xCenter + csgR} y={Math.max(yTOC, prevDrilledY)} width={holeR - csgR} height={yShoe - Math.max(yTOC, prevDrilledY)} fill="url(#slurry-diagonal)" />
+                                  )}
                                 </>
                               )}
                               {/* Casing wall heavy solid lines */}
@@ -1209,7 +1213,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                   {computedTools.map((tool, toolIdx) => {
                     const yTop = tool.visualYTop ?? (tool as { visual_y_top?: number }).visual_y_top ?? 0;
                     const yBottom = tool.visualYBottom ?? (tool as { visual_y_bottom?: number }).visual_y_bottom ?? yTop;
-                    const height = tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop);
+                    const height = Math.max(0, tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop));
                     const effectiveType = tool.effectiveType;
 
                     // Dynamically calculate the active inner casing radius at this tool's depth
@@ -1374,7 +1378,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                   }] : []).map((perf, pIdx) => {
                     const yTop = mapDepthToY(perf.topDepth || 0);
                     const yBottom = mapDepthToY(perf.bottomDepth || 0);
-                    const height = yBottom - yTop;
+                    const height = Math.max(0, yBottom - yTop);
 
                     const rows = [];
                     const step = Math.max(6, height / 10);
