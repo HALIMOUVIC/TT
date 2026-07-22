@@ -167,6 +167,9 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
             shoeDepth: parseFloat(String(newCasing.shoeDepth)) || 0,
             drilledDepth: parseFloat(String(newCasing.drilledDepth)) || 0,
             weight: parseFloat(String(newCasing.weight)) || 0,
+            topOfCement: newCasing.topOfCement !== undefined && newCasing.topOfCement !== null && !isNaN(parseFloat(String(newCasing.topOfCement))) ? parseFloat(String(newCasing.topOfCement)) : null,
+            topOfLiner: newCasing.topOfLiner !== undefined && newCasing.topOfLiner !== null && !isNaN(parseFloat(String(newCasing.topOfLiner))) ? parseFloat(String(newCasing.topOfLiner)) : null,
+            topOfFonde: newCasing.topOfFonde !== undefined && newCasing.topOfFonde !== null && !isNaN(parseFloat(String(newCasing.topOfFonde))) ? parseFloat(String(newCasing.topOfFonde)) : null,
           } as CasingString;
         }
         return c;
@@ -182,6 +185,9 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
         shoeDepth: parseFloat(String(newCasing.shoeDepth)) || 0,
         drilledDepth: parseFloat(String(newCasing.drilledDepth)) || 0,
         weight: parseFloat(String(newCasing.weight)) || 0,
+        topOfCement: newCasing.topOfCement !== undefined && newCasing.topOfCement !== null && !isNaN(parseFloat(String(newCasing.topOfCement))) ? parseFloat(String(newCasing.topOfCement)) : null,
+        topOfLiner: newCasing.topOfLiner !== undefined && newCasing.topOfLiner !== null && !isNaN(parseFloat(String(newCasing.topOfLiner))) ? parseFloat(String(newCasing.topOfLiner)) : null,
+        topOfFonde: newCasing.topOfFonde !== undefined && newCasing.topOfFonde !== null && !isNaN(parseFloat(String(newCasing.topOfFonde))) ? parseFloat(String(newCasing.topOfFonde)) : null,
       };
       updatedCasingsList = [...updatedCasingsList, entry];
     }
@@ -660,6 +666,7 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
                   <th className="px-2 py-2.5 text-center">Grade</th>
                   <th className="px-2 py-2.5 text-center">Connection</th>
                   <th className="px-2 py-2.5 text-right font-bold text-slate-500">Shoe Depth</th>
+                  <th className="px-2 py-2.5 text-right font-bold text-slate-500">TF (m)</th>
                   <th className="px-3 py-2.5 text-right w-20">Actions</th>
                 </tr>
               </thead>
@@ -674,6 +681,7 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
                     <td className="px-2 py-2.5 text-center font-mono text-slate-600">{c.grade || '-'}</td>
                     <td className="px-2 py-2.5 text-center font-mono text-slate-600">{c.connection || '-'}</td>
                     <td className="px-2 py-2.5 text-right font-mono font-bold text-slate-800">{c.shoeDepth.toFixed(2)}</td>
+                    <td className="px-2 py-2.5 text-right font-mono font-bold text-slate-800">{c.topOfFonde != null ? c.topOfFonde.toFixed(2) : '-'}</td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex justify-end gap-2.5 pr-2">
                         <button

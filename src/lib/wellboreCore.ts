@@ -77,6 +77,14 @@ export function calculateKeyAnchors(
       const toc = Number(c.topOfCement);
       if (!isNaN(toc)) depthsSet.add(toc);
     }
+    if (c.topOfLiner !== null && c.topOfLiner !== undefined) {
+      const tol = Number(c.topOfLiner);
+      if (!isNaN(tol)) depthsSet.add(tol);
+    }
+    if (c.topOfFonde !== null && c.topOfFonde !== undefined) {
+      const tf = Number(c.topOfFonde);
+      if (!isNaN(tf)) depthsSet.add(tf);
+    }
   });
   well.tubings.forEach((t) => {
     if (typeof t.bottomDepth === "number" && !isNaN(t.bottomDepth)) depthsSet.add(t.bottomDepth);
