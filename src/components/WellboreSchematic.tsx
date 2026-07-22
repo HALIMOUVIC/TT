@@ -1251,6 +1251,14 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
             const { yTop, yBottom, topDepth, bottomDepth, shotRows: rows } = layout.perforation!;
             const height = Math.max(0, yBottom - yTop);
 
+            // Get the active casing radius at the perforation depth so arrows start at the casing wall
+            const perfMidDepth = (topDepth + bottomDepth) / 2;
+            const perfCasingR = activeCasingRadius(well, layout.casings, perfMidDepth);
+            // Arrow tip extends ~22px past the casing wall outward
+            const arrowOuter = perfCasingR + 22;
+            // Arrowhead tip is 5px further out
+            const arrowTip = arrowOuter + 5;
+
             return (
               <g
                 key={perfo.id || 'perfo-merged'}
@@ -1268,106 +1276,37 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                 }
                 onMouseLeave={() => setHoveredItem(null)}
               >
-                {/* Perforation zone highlighting */}
+                {/* Perforation zone highlight — only spans casing width + arrow reach */}
                 <rect
-                  x={xCenter - 66}
+                  x={xCenter - arrowOuter}
                   y={yTop}
-                  width={132}
+                  width={arrowOuter * 2}
                   height={height || 4}
                   fill="#fecdd3"
-                  opacity="0.3"
-                  className="transition-opacity group-hover:opacity-50"
+                  opacity="0.25"
+                  className="transition-opacity group-hover:opacity-45"
                 />
 
-                {/* Horizontal perforations shots */}
+                {/* Horizontal perforation shot arrows — start at casing inner wall, point outward */}
                 {rows.map((yVal, i) => (
                   <g key={i}>
-                    {/* Left shots (2 arrows) */}
-                    <line
-                      x1={xCenter - 61}
-                      y1={yVal - 2}
-                      x2={xCenter - 3}
-                      y2={yVal - 2}
-                      stroke="#e11d48"
-                      strokeWidth="1.5"
-                    />
-                    <polygon
-                      points={`${xCenter - 65},${yVal - 2} ${xCenter - 61},${yVal - 4} ${xCenter - 61},${yVal}`}
-                      fill="#e11d48"
-                    />
-                    <line
-                      x1={xCenter - 61}
-                      y1={yVal + 2}
-                      x2={xCenter - 3}
-                      y2={yVal + 2}
-                      stroke="#e11d48"
-                      strokeWidth="1.5"
-                    />
-                    <polygon
-                      points={`${xCenter - 65},${yVal + 2} ${xCenter - 61},${yVal} ${xCenter - 61},${yVal + 4}`}
-                      fill="#e11d48"
-                    />
+                    {/* Left shot */}
+                    <line x1={xCenter - perfCasingR} y1={yVal - 2} x2={xCenter - arrowOuter} y2={yVal - 2} stroke="#c41230" strokeWidth="1.5" />
+                    <line x1={xCenter - perfCasingR} y1={yVal + 2} x2={xCenter - arrowOuter} y2={yVal + 2} stroke="#c41230" strokeWidth="1.5" />
+                    <polygon points={`${xCenter - arrowTip},${yVal} ${xCenter - arrowOuter},${yVal - 4} ${xCenter - arrowOuter},${yVal + 4}`} fill="#c41230" />
 
-                    {/* Right shots (2 arrows) */}
-                    <line
-                      x1={xCenter + 3}
-                      y1={yVal - 2}
-                      x2={xCenter + 61}
-                      y2={yVal - 2}
-                      stroke="#e11d48"
-                      strokeWidth="1.5"
-                    />
-                    <polygon
-                      points={`${xCenter + 65},${yVal - 2} ${xCenter + 61},${yVal - 4} ${xCenter + 61},${yVal}`}
-                      fill="#e11d48"
-                    />
-                    <line
-                      x1={xCenter + 3}
-                      y1={yVal + 2}
-                      x2={xCenter + 61}
-                      y2={yVal + 2}
-                      stroke="#e11d48"
-                      strokeWidth="1.5"
-                    />
-                    <polygon
-                      points={`${xCenter + 65},${yVal + 2} ${xCenter + 61},${yVal} ${xCenter + 61},${yVal + 4}`}
-                      fill="#e11d48"
-                    />
+                    {/* Right shot */}
+                    <line x1={xCenter + perfCasingR} y1={yVal - 2} x2={xCenter + arrowOuter} y2={yVal - 2} stroke="#c41230" strokeWidth="1.5" />
+                    <line x1={xCenter + perfCasingR} y1={yVal + 2} x2={xCenter + arrowOuter} y2={yVal + 2} stroke="#c41230" strokeWidth="1.5" />
+                    <polygon points={`${xCenter + arrowTip},${yVal} ${xCenter + arrowOuter},${yVal - 4} ${xCenter + arrowOuter},${yVal + 4}`} fill="#c41230" />
                   </g>
                 ))}
 
-                {/* Annotation lines for Perfos */}
-                <line
-                  x1={xCenter + 68}
-                  y1={yTop}
-                  x2={xCenter + 105}
-                  y2={yTop}
-                  stroke="#e11d48"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1={xCenter + 68}
-                  y1={yBottom}
-                  x2={xCenter + 105}
-                  y2={yBottom}
-                  stroke="#e11d48"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1={xCenter + 105}
-                  y1={yTop}
-                  x2={xCenter + 105}
-                  y2={yBottom}
-                  stroke="#e11d48"
-                  strokeWidth="1"
-                />
-                <text
-                  x={xCenter + 111}
-                  y={(yTop + yBottom) / 2 + 3}
-                  fontSize="10"
-                  fill="#be123c"
-                  fontWeight="bold"
-                >
+                {/* Annotation bracket: from arrow tip to label */}
+                <line x1={xCenter + arrowTip + 3} y1={yTop}    x2={xCenter + arrowTip + 28} y2={yTop}    stroke="#c41230" strokeWidth="1.2" />
+                <line x1={xCenter + arrowTip + 3} y1={yBottom} x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1.2" />
+                <line x1={xCenter + arrowTip + 28} y1={yTop}   x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1" />
+                <text x={xCenter + arrowTip + 33} y={(yTop + yBottom) / 2 + 3} fontSize="10" fill="#be123c" fontWeight="bold">
                   PERFS: {topDepth} - {bottomDepth}m
                 </text>
               </g>
