@@ -1287,18 +1287,26 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                   className="transition-opacity group-hover:opacity-45"
                 />
 
-                {/* Horizontal perforation shot arrows — start at casing inner wall, point outward */}
+                {/* Perforation conic jets — base at casing inner wall, tip pointing outward */}
                 {rows.map((yVal, i) => (
                   <g key={i}>
-                    {/* Left shot */}
-                    <line x1={xCenter - perfCasingR} y1={yVal - 2} x2={xCenter - arrowOuter} y2={yVal - 2} stroke="#c41230" strokeWidth="1.5" />
-                    <line x1={xCenter - perfCasingR} y1={yVal + 2} x2={xCenter - arrowOuter} y2={yVal + 2} stroke="#c41230" strokeWidth="1.5" />
-                    <polygon points={`${xCenter - arrowTip},${yVal} ${xCenter - arrowOuter},${yVal - 4} ${xCenter - arrowOuter},${yVal + 4}`} fill="#c41230" />
+                    {/* Left conic — base on casing wall, tip pointing left */}
+                    <polygon
+                      points={`${xCenter - perfCasingR},${yVal - 5} ${xCenter - perfCasingR},${yVal + 5} ${xCenter - arrowTip},${yVal}`}
+                      fill="#c41230"
+                      stroke="#7f0020"
+                      strokeWidth="0.6"
+                      strokeLinejoin="round"
+                    />
 
-                    {/* Right shot */}
-                    <line x1={xCenter + perfCasingR} y1={yVal - 2} x2={xCenter + arrowOuter} y2={yVal - 2} stroke="#c41230" strokeWidth="1.5" />
-                    <line x1={xCenter + perfCasingR} y1={yVal + 2} x2={xCenter + arrowOuter} y2={yVal + 2} stroke="#c41230" strokeWidth="1.5" />
-                    <polygon points={`${xCenter + arrowTip},${yVal} ${xCenter + arrowOuter},${yVal - 4} ${xCenter + arrowOuter},${yVal + 4}`} fill="#c41230" />
+                    {/* Right conic — base on casing wall, tip pointing right */}
+                    <polygon
+                      points={`${xCenter + perfCasingR},${yVal - 5} ${xCenter + perfCasingR},${yVal + 5} ${xCenter + arrowTip},${yVal}`}
+                      fill="#c41230"
+                      stroke="#7f0020"
+                      strokeWidth="0.6"
+                      strokeLinejoin="round"
+                    />
                   </g>
                 ))}
 
