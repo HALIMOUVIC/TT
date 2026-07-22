@@ -149,6 +149,39 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
             placeholder="e.g. + 0.68"
           />
         </div>
+
+        {/* SUSP. TBG - Olive */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_x_olive">SUSP. TBG - Olive</label>
+          <input
+            type="text"
+            id="well_x_olive"
+            className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+            value={well.xmasTreeOlive || ''}
+            onChange={(e) => handleChange('xmasTreeOlive', e.target.value)}
+            placeholder='e.g. CAM A403 Taraudée en 2" 7/8 EU'
+          />
+        </div>
+
+        {/* ETAN. S/ TBG - PKR de tête */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_packer_type">ETAN. S/ TBG - PKR de tête</label>
+          <input
+            type="text"
+            id="well_packer_type"
+            className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
+            value={well.packerType || well.etanTbg || ''}
+            onChange={(e) => {
+              onChange({
+                ...well,
+                packerType: e.target.value,
+                etanTbg: e.target.value,
+                updatedAt: new Date().toISOString()
+              });
+            }}
+            placeholder="e.g. //"
+          />
+        </div>
       </div>
 
       {/* TETE D'ERUPTION / CHRISTMAS TREE DETAILS */}
@@ -232,35 +265,6 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
               value={well.xmasTreeReduction || ''}
               onChange={(e) => handleChange('xmasTreeReduction', e.target.value)}
               placeholder='e.g. 7"1/16 X 2"9/16. 2000'
-            />
-          </div>
-          <div className="col-span-4">
-            <label className="block text-[10px] font-bold text-slate-500 mb-0.5" htmlFor="well_x_olive">SUSP. TBG - Olive</label>
-            <input
-              type="text"
-              id="well_x_olive"
-              className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium bg-white"
-              value={well.xmasTreeOlive || ''}
-              onChange={(e) => handleChange('xmasTreeOlive', e.target.value)}
-              placeholder='e.g. CAM A403 Taraudée en 2" 7/8 EU'
-            />
-          </div>
-          <div className="col-span-4">
-            <label className="block text-[10px] font-bold text-slate-500 mb-0.5" htmlFor="well_packer_type">ETAN. S/ TBG - PKR de tête</label>
-            <input
-              type="text"
-              id="well_packer_type"
-              className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium bg-white"
-              value={well.packerType || well.etanTbg || ''}
-              onChange={(e) => {
-                onChange({
-                  ...well,
-                  packerType: e.target.value,
-                  etanTbg: e.target.value,
-                  updatedAt: new Date().toISOString()
-                });
-              }}
-              placeholder="e.g. //"
             />
           </div>
         </div>
