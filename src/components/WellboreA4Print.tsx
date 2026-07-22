@@ -636,7 +636,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesMaitresseMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatTbgMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
-                      <td className="border-l border-b border-black bg-white text-center font-mono font-bold text-[9.5px] text-black align-middle py-0.5">
+                      <td className="border-l border-black bg-white text-center font-mono font-bold text-[9.5px] text-black align-middle py-0.5">
                         {well.packerType || well.etanTbg || '//'}
                       </td>
                     </tr>
