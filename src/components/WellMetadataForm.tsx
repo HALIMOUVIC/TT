@@ -139,14 +139,14 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
 
         {/* Spool / Rig Details */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_spool">Spool Prod / Rig connection</label>
+          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_spool">Sp.att tbg</label>
           <input
             type="text"
             id="well_spool"
             className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
             value={well.spoolProd || ''}
             onChange={(e) => handleChange('spoolProd', e.target.value)}
-            placeholder="e.g. CB 15A"
+            placeholder="e.g. + 0.68"
           />
         </div>
 
@@ -160,19 +160,6 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
             value={well.packerType || ''}
             onChange={(e) => handleChange('packerType', e.target.value)}
             placeholder="e.g. //"
-          />
-        </div>
-
-        {/* SUSP. TBG */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_susp_tbg">SUSP. TBG</label>
-          <input
-            type="text"
-            id="well_susp_tbg"
-            className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
-            value={well.suspTbg || ''}
-            onChange={(e) => handleChange('suspTbg', e.target.value)}
-            placeholder="e.g. SUSP. TBG"
           />
         </div>
 
@@ -274,14 +261,14 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
             />
           </div>
           <div className="col-span-4">
-            <label className="block text-[10px] font-bold text-slate-500 mb-0.5" htmlFor="well_x_olive">Olive / Hanger Spec</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-0.5" htmlFor="well_x_olive">SUSP. TBG - Olive</label>
             <input
               type="text"
               id="well_x_olive"
               className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-sky-500 font-medium bg-white"
               value={well.xmasTreeOlive || ''}
               onChange={(e) => handleChange('xmasTreeOlive', e.target.value)}
-              placeholder='e.g. CTC 1 A EST taraudée 2"7/8EU'
+              placeholder='e.g. CAM A403 Taraudée en 2" 7/8 EU'
             />
           </div>
         </div>
