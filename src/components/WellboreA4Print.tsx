@@ -624,7 +624,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">Maitresse</td>
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">LAT-TBG</td>
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">LAT-CSG.</td>
-                      <td rowSpan={4} className="p-0 bg-white align-middle border-l border-black">
+                      <td rowSpan={1} className="p-0 bg-white align-middle border-l border-b border-black">
                         <div className="flex flex-col h-full justify-between">
                           <div className="flex-1 flex items-center justify-center font-sans font-bold text-[7.5px] text-black border-b border-black text-center px-0.5 leading-none">
                             ETAN. S/ TBG - PKR de tête
@@ -643,6 +643,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesMaitresseMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatTbgMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
+                      <td rowSpan={3} className="border-l border-black bg-white"></td>
                     </tr>
 
                     {/* Row 6: Vannes Nombre */}
