@@ -636,13 +636,13 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
                       <td rowSpan={3} className="p-0 bg-white align-middle border-l border-black h-[52px]">
                         <div className="flex flex-col h-[52px] justify-between">
-                          <div className="h-[28px] flex items-center justify-center font-sans font-black text-[8.5px] uppercase tracking-wider text-black border-b border-black">
-                            {well.etanTbg || 'ETAN. S/ TBG.'}
+                          <div className="h-[26px] flex items-center justify-center font-mono font-bold text-[9px] text-black border-b border-black">
+                            {well.etanTbg || well.packerType || '//'}
                           </div>
-                          <div className="h-[28px] flex flex-col justify-center text-left pl-2 bg-white">
-                            <div className="text-[8.5px] font-sans font-bold text-black leading-tight pl-1">
+                          <div className="h-[26px] flex flex-col justify-center text-left pl-1 bg-white">
+                            <div className="text-[8.5px] font-sans font-bold text-black leading-tight">
                               <span className="underline decoration-black decoration-1 underline-offset-2">PKR de tête:</span>
-                              <span className="font-mono font-bold text-black ml-1">{well.packerType || ''}</span>
+                              <span className="font-mono font-bold text-black ml-1">{well.packerType || well.etanTbg || '//'}</span>
                             </div>
                           </div>
                         </div>
@@ -833,10 +833,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                   <span className="text-black font-sans text-[9.5px] font-bold">Z Prod:</span>
                   <span className="font-bold text-black">{formatDepth(well.elevationProduction)}</span>
                 </div>
-                <div className="p-1 flex justify-between items-baseline">
-                  <span className="text-black font-sans text-[9.5px] font-bold">PKR de tête:</span>
-                  <span className="font-bold text-black truncate max-w-[80px]" title={well.packerType || '//'}>{well.packerType || '//'}</span>
-                </div>
+                <div className="p-1"></div>
               </div>
 
               {/* Dynamic Blueprint Graphic SVG */}
