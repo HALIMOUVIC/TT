@@ -163,29 +163,23 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
           />
         </div>
 
-        {/* PKR de tête */}
+        {/* ETAN. S/ TBG - PKR de tête */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_packer_type">PKR de tête (Etan. s/ tbg)</label>
+          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_packer_type">ETAN. S/ TBG - PKR de tête</label>
           <input
             type="text"
             id="well_packer_type"
             className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
-            value={well.packerType || ''}
-            onChange={(e) => handleChange('packerType', e.target.value)}
+            value={well.packerType || well.etanTbg || ''}
+            onChange={(e) => {
+              onChange({
+                ...well,
+                packerType: e.target.value,
+                etanTbg: e.target.value,
+                updatedAt: new Date().toISOString()
+              });
+            }}
             placeholder="e.g. //"
-          />
-        </div>
-
-        {/* ETAN. S/ TBG. */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_etan_tbg">ETAN. S/ TBG.</label>
-          <input
-            type="text"
-            id="well_etan_tbg"
-            className="w-full px-3 py-1 h-7 text-[11px] border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium"
-            value={well.etanTbg || ''}
-            onChange={(e) => handleChange('etanTbg', e.target.value)}
-            placeholder="e.g. ETAN. S/ TBG."
           />
         </div>
       </div>
