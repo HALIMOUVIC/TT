@@ -850,8 +850,9 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                 >
                   <defs>
                     {/* True vintage diagonal hatch for concrete cement slurry */}
-                    <pattern id="slurry-diagonal" width="10" height="10" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
-                      <rect width="10" height="10" fill="#cbd5e1" />
+                    <pattern id="slurry-diagonal" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                      <rect width="8" height="8" fill="#ffffff" />
+                      <line x1="0" y1="0" x2="0" y2="8" stroke="#000000" strokeWidth="1.2" />
                     </pattern>
                     
                     {/* Sand / Sandstone reservoir dotting hatch */}
@@ -1093,32 +1094,40 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                               )}
 
                               {/* TF - Top Fonde Cement Plug */}
-                              {hasTF && tfVal !== null && yTF !== null && (
-                                <>
-                                  {/* Cement plug inside the casing */}
-                                  <rect
-                                    x={xCenter - csgR}
-                                    y={yTF}
-                                    width={csgR * 2}
-                                    height={Math.max(0, yShoe - yTF)}
-                                    fill="url(#slurry-diagonal)"
-                                  />
-                                  {/* Cement plug in the open hole pocket below the shoe */}
-                                  <path
-                                    d={`M ${xCenter - holeR} ${yShoe} L ${xCenter - holeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + holeR} ${yDrilled} L ${xCenter + holeR} ${yShoe} Z`}
-                                    fill="url(#slurry-diagonal)"
-                                  />
-                                  {/* Top plug border line */}
-                                  <line
-                                    x1={xCenter - csgR}
-                                    y1={yTF}
-                                    x2={xCenter + csgR}
-                                    y2={yTF}
-                                    stroke="#000"
-                                    strokeWidth="1.5"
-                                  />
-                                </>
-                              )}
+                              {hasTF && tfVal !== null && yTF !== null && (() => {
+                                const effPlugY = Math.min(yTF, yShoe - 10);
+                                const effPlugHeight = yShoe - effPlugY;
+                                return (
+                                  <>
+                                    {/* Cement plug inside the casing */}
+                                    <rect
+                                      x={xCenter - csgR}
+                                      y={effPlugY}
+                                      width={csgR * 2}
+                                      height={effPlugHeight}
+                                      fill="url(#slurry-diagonal)"
+                                      stroke="#000"
+                                      strokeWidth="0.8"
+                                    />
+                                    {/* Cement plug in the open hole pocket below the shoe */}
+                                    <path
+                                      d={`M ${xCenter - holeR} ${yShoe} L ${xCenter - holeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + holeR} ${yDrilled} L ${xCenter + holeR} ${yShoe} Z`}
+                                      fill="url(#slurry-diagonal)"
+                                      stroke="#000"
+                                      strokeWidth="0.8"
+                                    />
+                                    {/* Top plug border line */}
+                                    <line
+                                      x1={xCenter - csgR}
+                                      y1={effPlugY}
+                                      x2={xCenter + csgR}
+                                      y2={effPlugY}
+                                      stroke="#000"
+                                      strokeWidth="2"
+                                    />
+                                  </>
+                                );
+                              })()}
 
                               {/* Casing wall heavy solid lines */}
                               <line x1={xCenter - csgR} y1={yTop} x2={xCenter - csgR} y2={yShoe} stroke="#000" strokeWidth="2.5" />

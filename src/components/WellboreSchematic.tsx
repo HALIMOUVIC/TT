@@ -885,12 +885,13 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
             {/* Cement / Gravel Hatching pattern */}
             <pattern
               id="cement-pattern"
-              width="10"
-              height="10"
-              patternTransform="rotate(45 0 0)"
+              width="8"
+              height="8"
+              patternTransform="rotate(45)"
               patternUnits="userSpaceOnUse"
             >
-              <rect width="10" height="10" fill="#cbd5e1" />
+              <rect width="8" height="8" fill="#ffffff" />
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#334155" strokeWidth="1.5" />
             </pattern>
 
             {/* Mud / Formation dotted pattern */}
@@ -1091,44 +1092,50 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                         )}
 
                         {/* TF - Top Fonde Cement Plug */}
-                        {hasTF && tfVal !== null && yTF !== null && (
-                          <g
-                            className="cursor-pointer group"
-                            onMouseEnter={() =>
-                              setHoveredItem({
-                                name: `TF Plug (${formatCasingSize(casing.casingSize)})`,
-                                depth: `${tfVal}m - ${casing.drilledDepth}m`,
-                                type: `Cement plug in ${formatCasingSize(casing.casingSize)} Casing & open hole`,
-                              })
-                            }
-                            onMouseLeave={() => setHoveredItem(null)}
-                          >
-                            {/* Cement plug inside the casing */}
-                            <rect
-                              x={xCenter - casingR}
-                              y={yTF}
-                              width={casingR * 2}
-                              height={Math.max(0, yShoe - yTF)}
-                              fill="url(#cement-pattern)"
-                              className="transition-colors group-hover:fill-slate-200"
-                            />
-                            {/* Cement plug in the open hole pocket below the shoe */}
-                            <path
-                              d={`M ${xCenter - boreholeR} ${yShoe} L ${xCenter - boreholeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + boreholeR} ${yDrilled} L ${xCenter + boreholeR} ${yShoe} Z`}
-                              fill="url(#cement-pattern)"
-                              className="transition-colors group-hover:fill-slate-200"
-                            />
-                            {/* Top plug border line */}
-                            <line
-                              x1={xCenter - casingR}
-                              y1={yTF}
-                              x2={xCenter + casingR}
-                              y2={yTF}
-                              stroke="#0f172a"
-                              strokeWidth="1.5"
-                            />
-                          </g>
-                        )}
+                        {hasTF && tfVal !== null && yTF !== null && (() => {
+                          const effPlugY = Math.min(yTF, yShoe - 10);
+                          const effPlugHeight = yShoe - effPlugY;
+                          return (
+                            <g
+                              className="cursor-pointer group"
+                              onMouseEnter={() =>
+                                setHoveredItem({
+                                  name: `TF Plug (${formatCasingSize(casing.casingSize)})`,
+                                  depth: `${tfVal}m - ${casing.drilledDepth}m`,
+                                  type: `Cement plug in ${formatCasingSize(casing.casingSize)} Casing & open hole`,
+                                })
+                              }
+                              onMouseLeave={() => setHoveredItem(null)}
+                            >
+                              {/* Cement plug inside the casing */}
+                              <rect
+                                x={xCenter - casingR}
+                                y={effPlugY}
+                                width={casingR * 2}
+                                height={effPlugHeight}
+                                fill="url(#cement-pattern)"
+                                stroke="#334155"
+                                strokeWidth="0.8"
+                              />
+                              {/* Cement plug in the open hole pocket below the shoe */}
+                              <path
+                                d={`M ${xCenter - boreholeR} ${yShoe} L ${xCenter - boreholeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + boreholeR} ${yDrilled} L ${xCenter + boreholeR} ${yShoe} Z`}
+                                fill="url(#cement-pattern)"
+                                stroke="#334155"
+                                strokeWidth="0.8"
+                              />
+                              {/* Top plug border line */}
+                              <line
+                                x1={xCenter - casingR}
+                                y1={effPlugY}
+                                x2={xCenter + casingR}
+                                y2={effPlugY}
+                                stroke="#0f172a"
+                                strokeWidth="2"
+                              />
+                            </g>
+                          );
+                        })()}
 
                         {/* Casing Solid Metal Wall Lines */}
                         <g
