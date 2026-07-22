@@ -147,7 +147,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
 
   const printCasingsData = layout.casings.map((cd) => {
     const casing = well.casings[cd.casingIndex];
-    return { casing, i: cd.casingIndex, csgR: cd.casingR, holeR: cd.boreholeR, yTop: cd.yTop, yShoe: cd.yShoe, yDrilled: cd.yDrilled, yTOC: cd.yToc, hasCement: cd.hasCement, tocVal: cd.tocVal, hasLiner: cd.hasLiner, tolVal: cd.tolVal, yTOL: cd.yTol };
+    return { casing, i: cd.casingIndex, csgR: cd.casingR, holeR: cd.boreholeR, yTop: cd.yTop, yShoe: cd.yShoe, yDrilled: cd.yDrilled, yTOC: cd.yToc, hasCement: cd.hasCement, tocVal: cd.tocVal, hasLiner: cd.hasLiner, tolVal: cd.tolVal, yTOL: cd.yTol, hasTF: cd.hasTF, tfVal: cd.tfVal, yTF: cd.yTF };
   });
 
   const sortedCasings = layout.sortedCasingIndices.map((i) => well.casings[i]);
@@ -925,7 +925,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     }[] = [];
 
                     casingsData.forEach((cd) => {
-                      const { casing, i, csgR, holeR, yTop, yShoe, yDrilled, yTOC, hasCement, tocVal, hasLiner, tolVal, yTOL } = cd;
+                      const { casing, i, csgR, holeR, yTop, yShoe, yDrilled, yTOC, hasCement, tocVal, hasLiner, tolVal, yTOL, hasTF, tfVal, yTF } = cd;
                       
                       const csgSizeFormatted = formatCasingSize(casing.casingSize);
                       const holeSizeClean = String(casing.boreholeSize).replace(/['"]/g, '').trim();
@@ -974,6 +974,15 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                           rawLeftLabels.push({
                             lines: [`TOL ${csgSizeFormatted} :`, `${formatDepth(tolVal)} m`],
                             targetY: yTOL,
+                            targetX: xCenter - (holeR + csgR) / 2,
+                          });
+                        }
+
+                        // TF - Top Fonde (if set)
+                        if (hasTF && tfVal !== null && yTF !== null) {
+                          rawLeftLabels.push({
+                            lines: [`TF ${csgSizeFormatted} :`, `${formatDepth(tfVal)} m`],
+                            targetY: yTF,
                             targetX: xCenter - (holeR + csgR) / 2,
                           });
                         }

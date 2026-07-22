@@ -9,7 +9,7 @@ import fs from "fs";
 import ws from "ws";
 import Database from "better-sqlite3";
 import {
-  initDb, getDb, wasEverSynced, markSynced,
+  initDb, getDb, wasEverSynced, markSynced, runMigrations,
   upsertEmployee, upsertWell, upsertCasing, upsertTubing, upsertPerforation, upsertToolType, upsertHistory
 } from "./src/lib/localDb";
 
@@ -252,6 +252,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
   // ─── SQLite DB init & first-run Supabase sync ──────────────────────────────
   const userDataPath = process.env.USER_DATA_PATH || process.cwd();
   initDb(userDataPath);
+  runMigrations();
 
   // Try to sync from Supabase on first ever run (one-time migration)
   async function tryInitialSupabaseSync() {
@@ -364,6 +365,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
           drilledDepth: Number(c.drilled_depth) || 0,
           topOfCement: c.top_of_cement != null ? Number(c.top_of_cement) : null,
           topOfLiner: c.top_of_liner != null ? Number(c.top_of_liner) : null,
+          topOfFonde: c.top_of_fonde != null ? Number(c.top_of_fonde) : null,
           grade: c.grade, weight: c.weight != null ? Number(c.weight) : undefined,
           connection: c.connection, observations: c.observations
         })),
@@ -478,6 +480,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 top_depth: Number(c.topDepth) || 0, shoe_depth: Number(c.shoeDepth) || 0, drilled_depth: Number(c.drilledDepth) || 0,
                 top_of_cement: c.topOfCement != null ? Number(c.topOfCement) : null,
                 top_of_liner: c.topOfLiner != null ? Number(c.topOfLiner) : null,
+                top_of_fonde: c.topOfFonde != null ? Number(c.topOfFonde) : null,
                 grade: c.grade || "", weight: c.weight != null ? Number(c.weight) : null,
                 connection: c.connection || "", observations: c.observations || "", display_order: index + 1
               });

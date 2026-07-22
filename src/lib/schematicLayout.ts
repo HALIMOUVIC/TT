@@ -30,6 +30,9 @@ export interface CasingDrawData {
   hasLiner: boolean;
   tolVal: number | null;
   yTol: number | null;
+  hasTF: boolean;
+  tfVal: number | null;
+  yTF: number | null;
   blockY: number;
   prevCasingR: number;
   prevShoeY: number;
@@ -267,11 +270,14 @@ export function computeSchematicLayoutTs(
     const tocVal = hasCement ? Number(casing.topOfCement) : null;
     const hasLiner = isValidDepth(casing.topOfLiner as number | null | undefined);
     const tolVal = hasLiner ? Number(casing.topOfLiner) : null;
+    const hasTF = isValidDepth(casing.topOfFonde as number | null | undefined);
+    const tfVal = hasTF ? Number(casing.topOfFonde) : null;
     const yTop = mapY(casing.topDepth || 0);
     const yShoe = mapY(casing.shoeDepth || 0);
     const yDrilled = mapY(casing.drilledDepth || 0);
     const yToc = hasCement ? mapY(tocVal || 0) : yTop;
     const yTol = hasLiner ? mapY(tolVal || 0) : null;
+    const yTF = hasTF ? mapY(tfVal || 0) : null;
     return {
       casingIndex,
       casingId: casing.id,
@@ -286,6 +292,9 @@ export function computeSchematicLayoutTs(
       hasLiner,
       tolVal,
       yTol,
+      hasTF,
+      tfVal,
+      yTF,
       blockY: 0,
       prevCasingR: 0,
       prevShoeY: 0,
@@ -384,6 +393,7 @@ export function computeSchematicLayoutTs(
       rawLeft.push({ text: `Sbt: ${formatDepth(casing.shoeDepth)} m`, targetY: cd.yShoe, targetX: params.xCenter - cd.casingR, resolvedY: 0, labelType: 'Casing Shoe (Sabot)', depthStr: `${formatDepth(casing.shoeDepth)} m` });
       if (cd.hasCement && cd.tocVal !== null) rawLeft.push({ text: `TOC ${csgSize} : ${formatDepth(cd.tocVal)} m`, targetY: cd.yToc, targetX: params.xCenter - (cd.boreholeR + cd.casingR) / 2, resolvedY: 0, labelType: 'Cement Fill', depthStr: `${formatDepth(cd.tocVal)} m` });
       if (cd.hasLiner && cd.tolVal !== null && cd.yTol !== null) rawLeft.push({ text: `TOL ${csgSize} : ${formatDepth(cd.tolVal)} m`, targetY: cd.yTol, targetX: params.xCenter - (cd.boreholeR + cd.casingR) / 2, resolvedY: 0, labelType: 'Liner Hanger', depthStr: `${formatDepth(cd.tolVal)} m` });
+      if (cd.hasTF && cd.tfVal !== null && cd.yTF !== null) rawLeft.push({ text: `TF ${csgSize} : ${formatDepth(cd.tfVal)} m`, targetY: cd.yTF, targetX: params.xCenter - (cd.boreholeR + cd.casingR) / 2, resolvedY: 0, labelType: 'Top Fonde', depthStr: `${formatDepth(cd.tfVal)} m` });
       if (cd.yDrilled > cd.yShoe + 1) rawLeft.push({ text: `foré jusqu' à ${formatDepth(casing.drilledDepth)} m`, targetY: cd.yDrilled, targetX: params.xCenter - cd.boreholeR, resolvedY: 0, labelType: 'Drilled Borehole', depthStr: `${formatDepth(casing.drilledDepth)} m` });
     }
   });

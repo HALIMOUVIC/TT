@@ -29,6 +29,7 @@ export interface CasingString {
   drilledDepth: number; // in meters, e.g., 450.60 (Total depth drilled for this section)
   topOfCement: number | null; // in meters, e.g., 1800 (Top ciment)
   topOfLiner?: number | null; // Top of liner (TOL)
+  topOfFonde?: number | null; // TF (Top Fonde) - top of cement plug inside casing
   grade?: string; // e.g., "J55"
   weight?: number; // e.g., 20 lbs/ft
   connection?: string; // e.g., "BTC", "VAM"

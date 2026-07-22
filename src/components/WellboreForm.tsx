@@ -114,6 +114,8 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
     shoeDepth: 0,
     drilledDepth: 0,
     topOfCement: undefined,
+    topOfLiner: undefined,
+    topOfFonde: undefined,
     grade: '',
     weight: undefined,
     connection: '',
@@ -458,6 +460,17 @@ export default function WellboreForm({ well, onChange }: WellboreFormProps) {
                 className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono text-slate-700"
                 value={newCasing.topOfCement ?? ''}
                 onChange={(e) => setNewCasing(prev => ({ ...prev, topOfCement: isNaN(parseFloat(e.target.value)) ? null : parseFloat(e.target.value) }))}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-700 mb-1">TF - Top Fonde (m)</label>
+              <input
+                type="number"
+                step="0.01"
+                placeholder="e.g. 1200"
+                className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono text-slate-700"
+                value={newCasing.topOfFonde ?? ''}
+                onChange={(e) => setNewCasing(prev => ({ ...prev, topOfFonde: isNaN(parseFloat(e.target.value)) ? null : parseFloat(e.target.value) }))}
               />
             </div>
             <div>

@@ -98,6 +98,7 @@ export function initDb(userDataPath: string): Database.Database {
       drilled_depth REAL NOT NULL,
       top_of_cement REAL,
       top_of_liner REAL,
+      top_of_fonde REAL,
       grade TEXT,
       weight REAL,
       connection TEXT,
@@ -177,6 +178,13 @@ export function getDb(): Database.Database {
   return db;
 }
 
+// ─── Migrations: add new columns to existing DBs ─────────────────────────────
+export function runMigrations(): void {
+  const d = getDb();
+  try { d.prepare('ALTER TABLE casing_strings ADD COLUMN top_of_fonde REAL').run(); } catch (_) { /* column already exists */ }
+}
+
+
 // ─── Sync helpers ─────────────────────────────────────────────────────────────
 
 export function wasEverSynced(): boolean {
@@ -208,14 +216,14 @@ export function upsertWell(w: any): void {
 export function upsertCasing(c: any): void {
   const d = getDb();
   d.prepare(`
-    INSERT INTO casing_strings (id,well_id,name,borehole_size,casing_size,top_depth,shoe_depth,drilled_depth,top_of_cement,top_of_liner,grade,weight,connection,observations,display_order)
-    VALUES (@id,@well_id,@name,@borehole_size,@casing_size,@top_depth,@shoe_depth,@drilled_depth,@top_of_cement,@top_of_liner,@grade,@weight,@connection,@observations,@display_order)
+    INSERT INTO casing_strings (id,well_id,name,borehole_size,casing_size,top_depth,shoe_depth,drilled_depth,top_of_cement,top_of_liner,top_of_fonde,grade,weight,connection,observations,display_order)
+    VALUES (@id,@well_id,@name,@borehole_size,@casing_size,@top_depth,@shoe_depth,@drilled_depth,@top_of_cement,@top_of_liner,@top_of_fonde,@grade,@weight,@connection,@observations,@display_order)
     ON CONFLICT(id) DO UPDATE SET
       name=excluded.name, borehole_size=excluded.borehole_size, casing_size=excluded.casing_size,
       top_depth=excluded.top_depth, shoe_depth=excluded.shoe_depth, drilled_depth=excluded.drilled_depth,
-      top_of_cement=excluded.top_of_cement, top_of_liner=excluded.top_of_liner, grade=excluded.grade,
+      top_of_cement=excluded.top_of_cement, top_of_liner=excluded.top_of_liner, top_of_fonde=excluded.top_of_fonde, grade=excluded.grade,
       weight=excluded.weight, connection=excluded.connection, observations=excluded.observations, display_order=excluded.display_order
-  `).run({ ...c, top_of_cement: c.top_of_cement ?? null, top_of_liner: c.top_of_liner ?? null });
+  `).run({ ...c, top_of_cement: c.top_of_cement ?? null, top_of_liner: c.top_of_liner ?? null, top_of_fonde: c.top_of_fonde ?? null });
 }
 
 export function upsertTubing(t: any): void {
