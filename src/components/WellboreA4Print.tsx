@@ -1370,7 +1370,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     );
                   })}
 
-                  {/* ACTIVE INFLOW PERFORATIONS (Shot arrows and side braces) */}
+                  {/* ACTIVE INFLOW PERFORATIONS — red conic jets matching interactive schematic */}
                   {(well.perforations.length > 0 ? [{
                     ...well.perforations[0],
                     topDepth: Math.min(...well.perforations.map(p => p.topDepth || 0)),
@@ -1380,38 +1380,63 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     const yBottom = mapDepthToY(perf.bottomDepth || 0);
                     const height = Math.max(0, yBottom - yTop);
 
-                    const rows = [];
-                    const step = Math.max(6, height / 10);
-                    for (let y = yTop; y <= yBottom; y += step) {
-                      rows.push(y);
+                    // Compute active casing radius at perforation mid-depth
+                    const perfMidDepth = ((perf.topDepth || 0) + (perf.bottomDepth || 0)) / 2;
+                    const coveringCasings = printCasingsData.filter(cd => {
+                      const top = cd.casing.topDepth || 0;
+                      const shoe = cd.casing.shoeDepth || 0;
+                      return perfMidDepth >= top && perfMidDepth <= shoe;
+                    });
+                    let perfCsgR = printCasingsData.length > 0
+                      ? Math.min(...printCasingsData.map(cd => cd.csgR))
+                      : 11;
+                    if (coveringCasings.length > 0) {
+                      coveringCasings.sort((a, b) => a.csgR - b.csgR);
+                      perfCsgR = coveringCasings[0].csgR;
+                    }
+                    const arrowOuter = perfCsgR + 16;
+                    const arrowTip   = arrowOuter + 4;
+
+                    // Recompute conic rows directly from yTop/yBottom (guaranteed alignment)
+                    const numConics = height > 0 ? Math.max(2, Math.round(height / 10)) : 1;
+                    const step = height > 0 ? height / numConics : 0;
+                    const perfRows: number[] = [];
+                    for (let k = 0; k < numConics; k++) {
+                      perfRows.push(yTop + step * k + step / 2);
                     }
 
                     return (
                       <g key={`blueprint-perf-${perf.id}`}>
-                        {/* Red highlighting for shot points to draw immediate attention */}
-                        <rect x={xCenter - 61} y={yTop} width={122} height={height || 2} fill="#dc2626" opacity="0.08" />
+                        {/* Perforation zone highlight */}
+                        <rect x={xCenter - arrowOuter} y={yTop} width={arrowOuter * 2} height={height || 2} fill="#dc2626" opacity="0.08" />
 
-                        {rows.map((yVal, rIdx) => (
+                        {/* Conic jets — base at casing wall, tip pointing outward */}
+                        {perfRows.map((yVal, rIdx) => (
                           <g key={`shot-${rIdx}`}>
-                            {/* Left shot charges (2 arrows) */}
-                            <line x1={xCenter - 56} y1={yVal - 2} x2={xCenter - 2} y2={yVal - 2} stroke="#dc2626" strokeWidth="0.8" />
-                            <polygon points={`${xCenter - 60},${yVal - 2} ${xCenter - 56},${yVal - 4} ${xCenter - 56},${yVal}`} fill="#dc2626" />
-                            <line x1={xCenter - 56} y1={yVal + 2} x2={xCenter - 2} y2={yVal + 2} stroke="#dc2626" strokeWidth="0.8" />
-                            <polygon points={`${xCenter - 60},${yVal + 2} ${xCenter - 56},${yVal} ${xCenter - 56},${yVal + 4}`} fill="#dc2626" />
-
-                            {/* Right shot charges (2 arrows) */}
-                            <line x1={xCenter + 2} y1={yVal - 2} x2={xCenter + 56} y2={yVal - 2} stroke="#dc2626" strokeWidth="0.8" />
-                            <polygon points={`${xCenter + 60},${yVal - 2} ${xCenter + 56},${yVal - 4} ${xCenter + 56},${yVal}`} fill="#dc2626" />
-                            <line x1={xCenter + 2} y1={yVal + 2} x2={xCenter + 56} y2={yVal + 2} stroke="#dc2626" strokeWidth="0.8" />
-                            <polygon points={`${xCenter + 60},${yVal + 2} ${xCenter + 56},${yVal} ${xCenter + 56},${yVal + 4}`} fill="#dc2626" />
+                            {/* Left conic */}
+                            <polygon
+                              points={`${xCenter - perfCsgR},${yVal - 4} ${xCenter - perfCsgR},${yVal + 4} ${xCenter - arrowTip},${yVal}`}
+                              fill="#dc2626"
+                              stroke="#991b1b"
+                              strokeWidth="0.5"
+                              strokeLinejoin="round"
+                            />
+                            {/* Right conic */}
+                            <polygon
+                              points={`${xCenter + perfCsgR},${yVal - 4} ${xCenter + perfCsgR},${yVal + 4} ${xCenter + arrowTip},${yVal}`}
+                              fill="#dc2626"
+                              stroke="#991b1b"
+                              strokeWidth="0.5"
+                              strokeLinejoin="round"
+                            />
                           </g>
                         ))}
 
-                        {/* Top and Bottom perforation depths right specs - Spaced dynamically to prevent overlaps */}
+                        {/* Top and Bottom perforation depth labels */}
                         {(() => {
                           let textYTop = yTop;
                           let textYBottom = yBottom;
-                          const minGap = 15; // minimum vertical gap between De and A texts
+                          const minGap = 15;
                           if (textYBottom - textYTop < minGap) {
                             const midY = (yTop + yBottom) / 2;
                             textYTop = midY - minGap / 2;
@@ -1419,10 +1444,10 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                           }
                           return (
                             <g>
-                              <line x1={xCenter + 63} y1={yTop} x2={225} y2={textYTop} stroke="#dc2626" strokeWidth="0.8" markerStart="url(#arrow-left)" />
+                              <line x1={xCenter + arrowTip + 3} y1={yTop} x2={225} y2={textYTop} stroke="#dc2626" strokeWidth="0.8" markerStart="url(#arrow-left)" />
                               <text x={229} y={textYTop + 3.5} textAnchor="start" fontSize="12.5" fontWeight="black" fill="#dc2626">De: {formatDepth(perf.topDepth)}m</text>
 
-                              <line x1={xCenter + 63} y1={yBottom} x2={225} y2={textYBottom} stroke="#dc2626" strokeWidth="0.8" markerStart="url(#arrow-left)" />
+                              <line x1={xCenter + arrowTip + 3} y1={yBottom} x2={225} y2={textYBottom} stroke="#dc2626" strokeWidth="0.8" markerStart="url(#arrow-left)" />
                               <text x={229} y={textYBottom + 3.5} textAnchor="start" fontSize="12.5" fontWeight="black" fill="#dc2626">A: {formatDepth(perf.bottomDepth)}m</text>
                             </g>
                           );
