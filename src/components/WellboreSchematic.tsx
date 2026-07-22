@@ -1287,28 +1287,36 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                   className="transition-opacity group-hover:opacity-45"
                 />
 
-                {/* Perforation conic jets — base at casing inner wall, tip pointing outward */}
-                {rows.map((yVal, i) => (
-                  <g key={i}>
-                    {/* Left conic — base on casing wall, tip pointing left */}
-                    <polygon
-                      points={`${xCenter - perfCasingR},${yVal - 5} ${xCenter - perfCasingR},${yVal + 5} ${xCenter - arrowTip},${yVal}`}
-                      fill="#c41230"
-                      stroke="#7f0020"
-                      strokeWidth="0.6"
-                      strokeLinejoin="round"
-                    />
-
-                    {/* Right conic — base on casing wall, tip pointing right */}
-                    <polygon
-                      points={`${xCenter + perfCasingR},${yVal - 5} ${xCenter + perfCasingR},${yVal + 5} ${xCenter + arrowTip},${yVal}`}
-                      fill="#c41230"
-                      stroke="#7f0020"
-                      strokeWidth="0.6"
-                      strokeLinejoin="round"
-                    />
-                  </g>
-                ))}
+                {/* Perforation conic jets — positions recomputed from yTop/yBottom to always match the highlight zone */}
+                {(() => {
+                  // Recompute row positions directly from yTop/yBottom (not from layout shotRows which may differ)
+                  const numConics = height > 0 ? Math.max(2, Math.round(height / 12)) : 1;
+                  const step = height > 0 ? height / numConics : 0;
+                  const perfRows: number[] = [];
+                  for (let k = 0; k < numConics; k++) {
+                    perfRows.push(yTop + step * k + step / 2); // center each conic in its interval
+                  }
+                  return perfRows.map((yVal, i) => (
+                    <g key={i}>
+                      {/* Left conic — base on casing wall, tip pointing left */}
+                      <polygon
+                        points={`${xCenter - perfCasingR},${yVal - 5} ${xCenter - perfCasingR},${yVal + 5} ${xCenter - arrowTip},${yVal}`}
+                        fill="#c41230"
+                        stroke="#7f0020"
+                        strokeWidth="0.6"
+                        strokeLinejoin="round"
+                      />
+                      {/* Right conic — base on casing wall, tip pointing right */}
+                      <polygon
+                        points={`${xCenter + perfCasingR},${yVal - 5} ${xCenter + perfCasingR},${yVal + 5} ${xCenter + arrowTip},${yVal}`}
+                        fill="#c41230"
+                        stroke="#7f0020"
+                        strokeWidth="0.6"
+                        strokeLinejoin="round"
+                      />
+                    </g>
+                  ));
+                })()}
 
                 {/* Annotation bracket: from arrow tip to label */}
                 <line x1={xCenter + arrowTip + 3} y1={yTop}    x2={xCenter + arrowTip + 28} y2={yTop}    stroke="#c41230" strokeWidth="1.2" />
