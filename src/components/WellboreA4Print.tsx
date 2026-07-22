@@ -624,15 +624,8 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">Maitresse</td>
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">LAT-TBG</td>
                       <td className="border-r border-b border-black p-1 text-center bg-gray-200">LAT-CSG.</td>
-                      <td rowSpan={1} className="p-0 bg-white align-middle border-l border-black">
-                        <div className="flex flex-col h-full justify-between">
-                          <div className="flex-1 flex items-center justify-center font-sans font-bold text-[7.5px] text-black border-b border-black text-center px-0.5 leading-none">
-                            ETAN. S/ TBG - PKR de tête
-                          </div>
-                          <div className="flex-1 flex items-center justify-center font-mono font-bold text-[9.5px] text-black bg-white">
-                            {well.packerType || well.etanTbg || '//'}
-                          </div>
-                        </div>
+                      <td className="border-l border-b border-black bg-white text-center font-sans font-bold text-[7.5px] text-black px-0.5 py-1 select-none leading-none align-middle">
+                        ETAN. S/ TBG - PKR de tête
                       </td>
                     </tr>
 
@@ -643,7 +636,9 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesMaitresseMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatTbgMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
-                      <td rowSpan={3} className="border-l border-black bg-white"></td>
+                      <td className="border-l border-b border-black bg-white text-center font-mono font-bold text-[9.5px] text-black align-middle py-0.5">
+                        {well.packerType || well.etanTbg || '//'}
+                      </td>
                     </tr>
 
                     {/* Row 6: Vannes Nombre */}
@@ -653,6 +648,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black font-black text-center">{well.vannesMaitresseNombre || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black font-black text-center">{well.vannesLatTbgNombre || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black font-black text-center">{well.vannesLatCsgNombre || ''}</td>
+                      <td rowSpan={2} className="border-l border-black bg-white"></td>
                     </tr>
 
                     {/* Row 7: Vannes Ø et Série */}
