@@ -579,9 +579,8 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                         <span className="text-black text-[8px] font-bold">Ract. Sup. :</span>
                         <span className="font-bold text-[9px] text-black ml-1">{well.xmasTreeRactSup || ''}</span>
                       </td>
-                      <td className="border-b border-black p-1 text-center align-middle bg-white font-sans font-black text-[8.5px] uppercase tracking-wider">
-                        <span className="text-black font-black">SUSP : </span>
-                        <span className="ml-1">{well.suspTbg || 'S./TBG'}</span>
+                      <td className="border-b border-black p-1 text-center align-middle bg-white font-sans font-black text-[7.5px] uppercase tracking-wider leading-tight">
+                        ETAN. S/ TBG - PKR de tête
                       </td>
                     </tr>
 
@@ -634,15 +633,10 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesMaitresseMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatTbgMarque || ''}</td>
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
-                      <td rowSpan={3} className="p-0 bg-white align-middle border-l border-black h-[52px]">
-                        <div className="flex flex-col h-[52px] justify-between">
-                          <div className="h-[26px] flex items-center justify-center font-sans font-bold text-[7.5px] text-black border-b border-black text-center px-0.5 leading-none">
-                            ETAN. S/ TBG - PKR de tête
-                          </div>
-                          <div className="h-[26px] flex items-center justify-center font-mono font-bold text-[9.5px] text-black bg-white">
-                            {well.packerType || well.etanTbg || '//'}
-                          </div>
-                        </div>
+                      <td rowSpan={3} className="bg-white align-middle border-l border-black text-center p-1">
+                        <span className="font-mono font-bold text-[10.5px] text-black block leading-none">
+                          {well.packerType || well.etanTbg || '//'}
+                        </span>
                       </td>
                     </tr>
 
