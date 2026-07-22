@@ -548,6 +548,12 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
   );
   const { maxDepth, keyAnchors, filteredTubings, computedTools } = schematic;
   const { tbgBottomDepth, tbgVisualYBottom } = layout;
+  const globalYTF = layout.casings.reduce<number | null>((minY, cd) => {
+    if (cd.hasTF && cd.tfVal !== null && cd.yTF !== null) {
+      return minY === null ? cd.yTF : Math.min(minY, cd.yTF);
+    }
+    return minY;
+  }, null);
 
   const rightLabelYByToolId = useMemo(() => {
     const map = new Map<string, number>();
@@ -974,6 +980,9 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                       prevShoeY,
                       prevDrilledY,
                       prevBoreholeR,
+                      hasTF,
+                      tfVal,
+                      yTF,
                     } = cd;
 
                     return (
@@ -1078,6 +1087,46 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                                 className="transition-colors group-hover:fill-slate-200"
                               />
                             )}
+                          </g>
+                        )}
+
+                        {/* TF - Top Fonde Cement Plug */}
+                        {hasTF && tfVal !== null && yTF !== null && (
+                          <g
+                            className="cursor-pointer group"
+                            onMouseEnter={() =>
+                              setHoveredItem({
+                                name: `TF Plug (${formatCasingSize(casing.casingSize)})`,
+                                depth: `${tfVal}m - ${casing.drilledDepth}m`,
+                                type: `Cement plug in ${formatCasingSize(casing.casingSize)} Casing & open hole`,
+                              })
+                            }
+                            onMouseLeave={() => setHoveredItem(null)}
+                          >
+                            {/* Cement plug inside the casing */}
+                            <rect
+                              x={xCenter - casingR}
+                              y={yTF}
+                              width={casingR * 2}
+                              height={Math.max(0, yShoe - yTF)}
+                              fill="url(#cement-pattern)"
+                              className="transition-colors group-hover:fill-slate-200"
+                            />
+                            {/* Cement plug in the open hole pocket below the shoe */}
+                            <path
+                              d={`M ${xCenter - boreholeR} ${yShoe} L ${xCenter - boreholeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + boreholeR} ${yDrilled} L ${xCenter + boreholeR} ${yShoe} Z`}
+                              fill="url(#cement-pattern)"
+                              className="transition-colors group-hover:fill-slate-200"
+                            />
+                            {/* Top plug border line */}
+                            <line
+                              x1={xCenter - casingR}
+                              y1={yTF}
+                              x2={xCenter + casingR}
+                              y2={yTF}
+                              stroke="#0f172a"
+                              strokeWidth="1.5"
+                            />
                           </g>
                         )}
 
@@ -1352,7 +1401,8 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                 onMouseLeave={() => setHoveredItem(null)}
               >
                 {layout.tubingSegments.map((seg, sIdx) => {
-                  const segHeight = seg.yEnd - seg.yStart;
+                  const effectiveYEnd = globalYTF !== null ? Math.min(seg.yEnd, globalYTF) : seg.yEnd;
+                  const segHeight = effectiveYEnd - seg.yStart;
                   if (segHeight <= 0) return null;
                   return (
                     <g key={`tbg-seg-${sIdx}`}>
@@ -1380,7 +1430,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                         x1={xCenter - 7}
                         y1={seg.yStart}
                         x2={xCenter - 7}
-                        y2={seg.yEnd}
+                        y2={effectiveYEnd}
                         stroke="#0f172a"
                         strokeWidth="1.5"
                       />
@@ -1388,7 +1438,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                         x1={xCenter + 7}
                         y1={seg.yStart}
                         x2={xCenter + 7}
-                        y2={seg.yEnd}
+                        y2={effectiveYEnd}
                         stroke="#0f172a"
                         strokeWidth="1.5"
                       />
@@ -1398,14 +1448,17 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
               </g>
           )}
 
-          {/* Continuous tubing through completion clusters (nipple → packer → shoe) */}
-          {completionBackbones.map((range, idx) =>
-            renderTubingColumn(range.yStart, range.yEnd, `completion-backbone-${idx}`)
-          )}
+          {completionBackbones.map((range, idx) => {
+            const effectiveYEnd = globalYTF !== null ? Math.min(range.yEnd, globalYTF) : range.yEnd;
+            const height = effectiveYEnd - range.yStart;
+            if (height <= 0) return null;
+            return renderTubingColumn(range.yStart, effectiveYEnd, `completion-backbone-${idx}`);
+          })}
 
           {/* TUBING STRING COMPONENTS (Packers, Side pocket mandrels, Reduction, Shoes) */}
           {computedTools.map((tool, toolIdx) => {
             const yTop = tool.visualYTop ?? (tool as { visual_y_top?: number }).visual_y_top ?? 0;
+            if (globalYTF !== null && yTop >= globalYTF) return null;
             const yBottom = tool.visualYBottom ?? (tool as { visual_y_bottom?: number }).visual_y_bottom ?? yTop;
             const height = Math.max(0, tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop));
             const effectiveType = tool.effectiveType;

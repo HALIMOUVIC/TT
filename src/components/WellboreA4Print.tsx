@@ -80,6 +80,12 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
   );
   const { maxDepth, keyAnchors, computedTools } = schematic;
   const { tbgBottomDepth, tbgVisualYBottom, tubingSegments } = layout;
+  const globalYTF = layout.casings.reduce<number | null>((minY, cd) => {
+    if (cd.hasTF && cd.tfVal !== null && cd.yTF !== null) {
+      return minY === null ? cd.yTF : Math.min(minY, cd.yTF);
+    }
+    return minY;
+  }, null);
 
   const completionBackbones = React.useMemo(() => {
     const isTubingLike = (t: string) => t === 'Tubing' || t === 'Tubing Court';
@@ -225,7 +231,9 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
       });
     }
 
-    const toolLabels: ResolutionLabel[] = computedTools.map((tool) => {
+    const toolLabels: ResolutionLabel[] = computedTools
+      .filter((tool) => globalYTF === null || (tool.visualYTop ?? 0) < globalYTF)
+      .map((tool) => {
       const yBottom = tool.visualYBottom;
       const yTop = tool.visualYTop;
       const height = tool.visualHeight;
@@ -1041,7 +1049,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     return (
                       <g key="all-casings-group">
                         {casingsData.map((cd) => {
-                          const { casing, i, csgR, holeR, yTop, yShoe, yDrilled, yTOC, hasCement, hasLiner, yTOL } = cd;
+                          const { casing, i, csgR, holeR, yTop, yShoe, yDrilled, yTOC, hasCement, hasLiner, yTOL, hasTF, tfVal, yTF } = cd;
                           const previousCsg = i > 0 ? casingsData[i - 1] : null;
                           const prevShoeY = previousCsg ? previousCsg.yShoe : yTop;
                           const prevDrilledY = previousCsg ? previousCsg.yDrilled : yTop;
@@ -1083,6 +1091,35 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                                   )}
                                 </>
                               )}
+
+                              {/* TF - Top Fonde Cement Plug */}
+                              {hasTF && tfVal !== null && yTF !== null && (
+                                <>
+                                  {/* Cement plug inside the casing */}
+                                  <rect
+                                    x={xCenter - csgR}
+                                    y={yTF}
+                                    width={csgR * 2}
+                                    height={Math.max(0, yShoe - yTF)}
+                                    fill="url(#slurry-diagonal)"
+                                  />
+                                  {/* Cement plug in the open hole pocket below the shoe */}
+                                  <path
+                                    d={`M ${xCenter - holeR} ${yShoe} L ${xCenter - holeR} ${yDrilled} Q ${xCenter} ${yDrilled + 6} ${xCenter + holeR} ${yDrilled} L ${xCenter + holeR} ${yShoe} Z`}
+                                    fill="url(#slurry-diagonal)"
+                                  />
+                                  {/* Top plug border line */}
+                                  <line
+                                    x1={xCenter - csgR}
+                                    y1={yTF}
+                                    x2={xCenter + csgR}
+                                    y2={yTF}
+                                    stroke="#000"
+                                    strokeWidth="1.5"
+                                  />
+                                </>
+                              )}
+
                               {/* Casing wall heavy solid lines */}
                               <line x1={xCenter - csgR} y1={yTop} x2={xCenter - csgR} y2={yShoe} stroke="#000" strokeWidth="2.5" />
                               <line x1={xCenter + csgR} y1={yTop} x2={xCenter + csgR} y2={yShoe} stroke="#000" strokeWidth="2.5" />
@@ -1157,15 +1194,19 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     return (
                       <g key="tubing-string-blueprint">
                         {tubingSegments.map((seg, sIdx) => {
-                          const segHeight = seg.yEnd - seg.yStart;
+                          const effectiveYEnd = globalYTF !== null ? Math.min(seg.yEnd, globalYTF) : seg.yEnd;
+                          const segHeight = effectiveYEnd - seg.yStart;
                           if (segHeight <= 0) return null;
-                          return renderPrintTubingColumn(seg.yStart, seg.yEnd, `tbg-seg-print-${sIdx}`, tbgR);
+                          return renderPrintTubingColumn(seg.yStart, effectiveYEnd, `tbg-seg-print-${sIdx}`, tbgR);
                         })}
 
                         {/* Tubing through completion clusters (mandrel, nipple, packer, shoe) */}
-                        {completionBackbones.map((range, idx) =>
-                          renderPrintTubingColumn(range.yStart, range.yEnd, `completion-backbone-print-${idx}`, tbgR)
-                        )}
+                        {completionBackbones.map((range, idx) => {
+                          const effectiveYEnd = globalYTF !== null ? Math.min(range.yEnd, globalYTF) : range.yEnd;
+                          const height = effectiveYEnd - range.yStart;
+                          if (height <= 0) return null;
+                          return renderPrintTubingColumn(range.yStart, effectiveYEnd, `completion-backbone-print-${idx}`, tbgR);
+                        })}
 
                         {/* STATIC BRACED PRODUCTION CSG LABEL (Exactly like hand-drawn CAD) */}
                         {sortedCasings.filter(c => parseSizeToNumber(c.casingSize) > 2.5).map((csg, index) => {
@@ -1211,6 +1252,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                   {/* INTERACTIVE TUBING TOOL ATTACHMENTS (Mandrels, Packers, Reductions, Shoes) */}
                   {computedTools.map((tool, toolIdx) => {
                     const yTop = tool.visualYTop ?? (tool as { visual_y_top?: number }).visual_y_top ?? 0;
+                    if (globalYTF !== null && yTop >= globalYTF) return null;
                     const yBottom = tool.visualYBottom ?? (tool as { visual_y_bottom?: number }).visual_y_bottom ?? yTop;
                     const height = Math.max(0, tool.visualHeight ?? (tool as { visual_height?: number }).visual_height ?? (yBottom - yTop));
                     const effectiveType = tool.effectiveType;
