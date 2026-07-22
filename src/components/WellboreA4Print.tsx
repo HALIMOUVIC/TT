@@ -636,14 +636,11 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       <td className="border-r border-b border-black p-0.5 text-black text-center">{well.vannesLatCsgMarque || ''}</td>
                       <td rowSpan={3} className="p-0 bg-white align-middle border-l border-black h-[52px]">
                         <div className="flex flex-col h-[52px] justify-between">
-                          <div className="h-[26px] flex items-center justify-center font-mono font-bold text-[9px] text-black border-b border-black">
-                            {well.etanTbg || well.packerType || '//'}
+                          <div className="h-[26px] flex items-center justify-center font-sans font-bold text-[7.5px] text-black border-b border-black text-center px-0.5 leading-none">
+                            ETAN. S/ TBG - PKR de tête
                           </div>
-                          <div className="h-[26px] flex flex-col justify-center text-left pl-1 bg-white">
-                            <div className="text-[8.5px] font-sans font-bold text-black leading-tight">
-                              <span className="underline decoration-black decoration-1 underline-offset-2">PKR de tête:</span>
-                              <span className="font-mono font-bold text-black ml-1">{well.packerType || well.etanTbg || '//'}</span>
-                            </div>
+                          <div className="h-[26px] flex items-center justify-center font-mono font-bold text-[9.5px] text-black bg-white">
+                            {well.packerType || well.etanTbg || '//'}
                           </div>
                         </div>
                       </td>
