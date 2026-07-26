@@ -139,11 +139,9 @@ export default function Login({ onLogin }: LoginProps) {
 
           <div className="absolute -top-[30%] -left-[10%] w-[70%] h-[70%] rounded-full bg-[#f97316] blur-[150px] opacity-30 pointer-events-none"></div>
 
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="p-3 bg-slate-900/90 border border-slate-800/80 rounded-2xl shadow-2xl backdrop-blur-md flex items-center justify-center shrink-0">
-              <img src="/logo.svg" className="w-20 h-14 object-contain" alt="Logo" />
-            </div>
-            <span className="text-3xl font-black text-white tracking-tight">Wellbore Pro</span>
+          <div className="relative z-10 flex items-center gap-3">
+            <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
+            <span className="text-xl font-black text-white tracking-tight">Wellbore Pro</span>
           </div>
 
           <div className="relative z-10 max-w-md">
@@ -163,11 +161,9 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Right Side - Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 xl:p-24 relative">
           <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl shadow-2xl space-y-10 border border-slate-100">
-            <div className="flex lg:hidden items-center gap-4 mb-8">
-              <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl shadow-xl flex items-center justify-center shrink-0">
-                <img src="/logo.svg" className="w-16 h-11 object-contain" alt="Logo" />
-              </div>
-              <span className="text-2xl font-black text-slate-900 tracking-tight">Wellbore Pro</span>
+            <div className="flex lg:hidden items-center gap-3 mb-8">
+              <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
+              <span className="text-xl font-black text-slate-900 tracking-tight">Wellbore Pro</span>
             </div>
 
             <div>
