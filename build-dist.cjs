@@ -125,7 +125,7 @@ async function main() {
         uninstallerIcon: 'wellborePro.ico',
         uninstallDisplayName: 'Wellbore Schematic Pro',
         artifactName: 'WellboreSchematicPro Setup.${ext}',
-        runAfterFinish: true
+        runAfterFinish: false
       }
     };
 
