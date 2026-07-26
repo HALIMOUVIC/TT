@@ -1,46 +1,157 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Wellbore Schematic Pro
 
-# Run and deploy your AI Studio app
+> Plateforme unifiée pour la gestion des puits, le suivi des complétions et l'historisation des données techniques.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/ce482bb2-40fb-4b4f-b5a6-7bf3a31d50f3
-
-## Run Locally
-
-**Prerequisites:**  Node.js (Rust optional, for WASM calculations)
+---
 
 ## Architecture
 
-- **TypeScript / React** — UI only
-- **Rust (`rust/wellbore-core`)** — all wellbore calculations
-- **WASM** — runs Rust in the browser (see [RUST_ARCHITECTURE.md](RUST_ARCHITECTURE.md))
+| Layer | Technology |
+|---|---|
+| **UI** | TypeScript / React / Vite |
+| **Server** | Node.js + Express + better-sqlite3 |
+| **Calculations** | Rust (`rust/wellbore-core`) compiled to WebAssembly |
+| **Desktop App** | Electron (wraps the full stack) |
+| **Database** | SQLite (local, via better-sqlite3) |
 
-## Run Locally
+---
 
-1. Install dependencies:
-   `npm install`
-2. Create `.env` or `.env.local` in the project root and set:
-   - `SUPABASE_URL` — your Supabase project URL (Dashboard → Project Settings → API)
-   - `SUPABASE_SERVICE_ROLE_KEY` — service role key (server uses this for login and wells sync)
-   - `SUPABASE_KEY` — anon public key (optional fallback)
-   - `GEMINI_API_KEY` — optional, only needed for AI extraction features
-3. Run the SQL in [supabase_schema.sql](supabase_schema.sql) in your Supabase SQL Editor for wells/casing/tubing tables.
-   For **Catalogue des Composants** only, you can run [custom_tool_types_migration.sql](custom_tool_types_migration.sql) instead.
-   Login uses your existing `public.employees` table — do not recreate it from this file.
-4. Run the app:
-   `npm run dev`
+## Prerequisites
 
-## Build Rust WASM (optional, faster calculations)
+| Tool | Required | Notes |
+|---|---|---|
+| [Node.js](https://nodejs.org/) ≥ 18 | ✅ Yes | Install from nodejs.org |
+| [Rust + Cargo](https://rustup.rs/) | ⚠️ Only for WASM rebuild | Install via rustup |
+| [wasm-pack](https://rustwasm.github.io/wasm-pack/) | ⚠️ Only for WASM rebuild | `cargo install wasm-pack` |
 
-Requires [Rust](https://rustup.rs/) and `wasm-pack`:
+---
+
+## 1. Run Locally (Development)
 
 ```powershell
+# Install dependencies
+npm install
+
+# Start the dev server (browser app)
+npm run dev
+```
+
+Then open `http://localhost:5173` in your browser.
+
+---
+
+## 2. Build Rust WASM (optional — for faster calculations)
+
+> Skip this if the `src/wasm/` folder already contains `.wasm` files.
+
+```powershell
+# Add the WASM target to Rust
 rustup target add wasm32-unknown-unknown
+
+# Install wasm-pack
 cargo install wasm-pack
+
+# Build the WASM bindings
 npm run build:wasm
 ```
 
-The app falls back to TypeScript if WASM is not built.
+The app automatically falls back to TypeScript if WASM is unavailable.
+
+---
+
+## 3. Export the App as a Windows EXE Installer
+
+> This produces `build-desktop/WellboreSchematicPro Setup.exe`
+
+### Step 1 — Make sure you have enough disk space
+
+The build requires **at least 700 MB free** on your C: drive.
+You can check with:
+
+```powershell
+Get-PSDrive C | Select-Object @{N='Free_GB';E={[math]::Round($_.Free/1GB,2)}}
+```
+
+### Step 2 — (Optional) Rebuild WASM if you changed Rust code
+
+```powershell
+npm run build:wasm
+```
+
+### Step 3 — Clean old build output (recommended)
+
+```powershell
+Remove-Item -Recurse -Force "build-desktop" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "package-staging" -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force "dist" -ErrorAction SilentlyContinue
+```
+
+### Step 4 — Build the EXE installer
+
+```powershell
+npm run dist:exe
+```
+
+### Step 5 — Locate the installer
+
+When the build finishes you will see:
+
+```
+==================================================
+SUCCESS: Installer generated inside "build-desktop/"!
+==================================================
+```
+
+Your installer is at:
+
+```
+build-desktop\WellboreSchematicPro Setup.exe
+```
+
+Double-click it to install the app on any Windows machine.
+
+---
+
+## Quick Reference — All Commands
+
+```powershell
+# 1. Install dependencies
+npm install
+
+# 2. Run in browser (development)
+npm run dev
+
+# 3. Build Rust WASM (only when Rust code changes)
+npm run build:wasm
+
+# 4. Build Vite + server bundle only (no installer)
+npm run build
+
+# 5. Build full Windows EXE installer  ← most common
+npm run dist:exe
+
+# 6. Clean build outputs
+Remove-Item -Recurse -Force "build-desktop","package-staging","dist" -ErrorAction SilentlyContinue
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---|---|
+| `There is not enough space on the disk` | Free at least 700 MB on C: drive and retry `npm run dist:exe` |
+| `Cannot find module '../wasm/wellbore_wasm.js'` | Run `npm run build:wasm` first |
+| App opens but schematic is blank | Run `npm install` then retry |
+| Installer finish screen shows error | Known Windows association quirk — the app is installed correctly, launch it from Start Menu |
+
+---
+
+## Output Files
+
+| File | Description |
+|---|---|
+| `build-desktop/WellboreSchematicPro Setup.exe` | Windows NSIS installer (distribute this) |
+| `build-desktop/win-unpacked/` | Unpacked app (for testing without install) |
+| `dist/` | Vite + server build output (bundled into EXE) |
+| `src/wasm/` | Compiled WebAssembly binaries |
