@@ -745,10 +745,12 @@ export default function App() {
         id="app_sidebar"
       >
         <div className="flex flex-col flex-1">
-          <div className="p-6 border-b border-slate-800/40 flex items-center gap-4 bg-[#0c1222]">
-            <img src="/logo.svg" className="w-12 h-12 object-contain" alt="Logo" />
+          <div className="p-5 border-b border-slate-800/40 flex items-center gap-3.5 bg-[#0c1222]">
+            <div className="p-2 bg-slate-900/90 border border-slate-800 rounded-xl shadow-md flex items-center justify-center shrink-0">
+              <img src="/logo.svg" className="w-14 h-10 object-contain" alt="Logo" />
+            </div>
             <div>
-              <h1 className="text-white font-black tracking-wider text-lg font-sans uppercase">
+              <h1 className="text-white font-black tracking-wider text-base font-sans uppercase">
                 Wellbore Pro
               </h1>
             </div>
