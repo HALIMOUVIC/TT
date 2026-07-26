@@ -30,11 +30,14 @@ async function main() {
     }
 
     // 4. Write staging package.json with unique name to avoid workspace symlink issues
+    // 4. Write staging package.json with description and author to eliminate warnings
     fs.writeFileSync(
       path.join(stagingDir, 'package.json'),
       JSON.stringify({
         name: 'wellbore-pro-staging',
         version: '1.0.0',
+        description: 'Wellbore Schematic Pro',
+        author: 'ENP',
         main: 'electron-main.cjs',
         dependencies: {
           'better-sqlite3': '^12.11.1'
@@ -121,7 +124,8 @@ async function main() {
         installerIcon: 'wellborePro.ico',
         uninstallerIcon: 'wellborePro.ico',
         uninstallDisplayName: 'Wellbore Schematic Pro',
-        artifactName: 'WellboreSchematicPro Setup.${ext}'
+        artifactName: 'WellboreSchematicPro Setup.${ext}',
+        runAfterFinish: true
       }
     };
 
