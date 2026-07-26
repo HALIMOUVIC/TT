@@ -1,8 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Save, PenLine } from 'lucide-react';
+import { Plus, Trash2, Save, PenLine, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { updateTubingComponentMatrix } from '../lib/wellboreEngine';
 
-interface CustomTool {
+export interface CustomTool {
   id?: string;
   type: string;
   default_name: string;
@@ -18,11 +35,124 @@ interface CustomToolsModalProps {
   canDelete?: boolean;
 }
 
+function SortableToolRow({
+  tool,
+  index,
+  total,
+  isEditing,
+  editForm,
+  canAddOrEdit,
+  canDelete,
+  onStartEdit,
+  onDelete,
+  onMoveUp,
+  onMoveDown,
+  setEditForm,
+  onSave,
+  onCancel
+}: {
+  tool: CustomTool;
+  index: number;
+  total: number;
+  isEditing: boolean;
+  editForm: Partial<CustomTool>;
+  canAddOrEdit: boolean;
+  canDelete: boolean;
+  onStartEdit: (tool: CustomTool) => void;
+  onDelete: (id: string) => void;
+  onMoveUp: (index: number) => void;
+  onMoveDown: (index: number) => void;
+  setEditForm: (form: Partial<CustomTool>) => void;
+  onSave: (form: Partial<CustomTool>) => void;
+  onCancel: () => void;
+}) {
+  const toolId = tool.id || `tool-${index}`;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: toolId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1
+  };
+
+  if (isEditing) {
+    return (
+      <tr ref={setNodeRef} style={style} className="bg-blue-50/30">
+        <td className="px-4 py-3" colSpan={5}>
+          <EditForm form={editForm} onChange={setEditForm} onCancel={onCancel} onSave={() => onSave(editForm)} />
+        </td>
+      </tr>
+    );
+  }
+
+  return (
+    <tr ref={setNodeRef} style={style} className="hover:bg-slate-50/50 group transition-colors bg-white">
+      <td
+        className="w-10 px-3 py-3 cursor-grab text-slate-400 hover:text-slate-600 active:cursor-grabbing text-center"
+        {...attributes}
+        {...listeners}
+        title="Glisser-déposer pour réorganiser à la souris"
+      >
+        <GripVertical className="w-4 h-4 mx-auto" />
+      </td>
+      <td className="px-4 py-3 font-medium text-slate-800">{tool.french_designation || tool.type}</td>
+      <td className="px-4 py-3">{tool.default_od || "-"}</td>
+      <td className="px-4 py-3">{tool.default_custom_type || "-"}</td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {canAddOrEdit && (
+            <>
+              <button
+                type="button"
+                onClick={() => onMoveUp(index)}
+                disabled={index === 0}
+                className="p-1 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded disabled:opacity-30 disabled:hover:bg-transparent transition"
+                title="Déplacer vers le haut"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onMoveDown(index)}
+                disabled={index === total - 1}
+                className="p-1 text-slate-400 hover:text-orange-600 hover:bg-orange-50 rounded disabled:opacity-30 disabled:hover:bg-transparent transition"
+                title="Déplacer vers le bas"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+              <button onClick={() => onStartEdit(tool)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="Modifier">
+                <PenLine className="w-4 h-4" />
+              </button>
+            </>
+          )}
+          {canDelete && (
+            <button onClick={() => onDelete(tool.id!)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Supprimer">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDelete = true }: CustomToolsModalProps) {
   const [tools, setTools] = useState<CustomTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<CustomTool>>({});
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const fetchTools = async () => {
     try {
@@ -43,6 +173,41 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
   useEffect(() => {
     fetchTools();
   }, []);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setTools((items) => {
+        const oldIndex = items.findIndex((item, idx) => (item.id || `tool-${idx}`) === active.id);
+        const newIndex = items.findIndex((item, idx) => (item.id || `tool-${idx}`) === over.id);
+        if (oldIndex < 0 || newIndex < 0) return items;
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        updateTubingComponentMatrix(reordered);
+        if (onUpdated) onUpdated();
+        return reordered;
+      });
+    }
+  };
+
+  const handleMoveUp = (index: number) => {
+    if (index <= 0) return;
+    setTools((items) => {
+      const reordered = arrayMove(items, index, index - 1);
+      updateTubingComponentMatrix(reordered);
+      if (onUpdated) onUpdated();
+      return reordered;
+    });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index >= tools.length - 1) return;
+    setTools((items) => {
+      const reordered = arrayMove(items, index, index + 1);
+      updateTubingComponentMatrix(reordered);
+      if (onUpdated) onUpdated();
+      return reordered;
+    });
+  };
 
   const handleSave = async (tool: Partial<CustomTool>) => {
     if (!tool.french_designation) {
@@ -120,6 +285,8 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
     });
   };
 
+  const itemIds = tools.map((t, idx) => t.id || `tool-${idx}`);
+
   return (
     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
       <div className="bg-white rounded-xl shadow-xs border border-slate-200 w-full flex flex-col overflow-hidden">
@@ -128,7 +295,7 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
         <div className="px-6 py-4 flex items-center justify-between border-b border-slate-100 bg-slate-50/50 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-slate-800">Catalogue des Composants</h2>
-            <p className="text-xs text-slate-500">Ajoutez, modifiez ou supprimez les types de composants tubings pour les rendus vectoriels.</p>
+            <p className="text-xs text-slate-500">Ajoutez, modifiez, supprimez ou réorganisez à la souris les types de composants tubings.</p>
           </div>
         </div>
 
@@ -150,57 +317,52 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
           </div>
 
           <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-            <table className="w-full text-left text-xs text-slate-600">
-              <thead className="bg-slate-100/80 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Désignation</th>
-                  <th className="px-4 py-3">OD par défaut</th>
-                  <th className="px-4 py-3">Connexion par défaut</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {editingId && editForm.id === undefined && (
-                  <tr className="bg-orange-50/50">
-                    <td className="px-4 py-3" colSpan={4}>
-                      <EditForm form={editForm} onChange={setEditForm} onCancel={() => setEditingId(null)} onSave={() => handleSave(editForm)} isNew />
-                    </td>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-100/80 border-b border-slate-200 text-[10px] uppercase tracking-wider text-slate-500">
+                  <tr>
+                    <th className="w-10 px-3 py-3 text-center">Ordre</th>
+                    <th className="px-4 py-3">Désignation</th>
+                    <th className="px-4 py-3">OD par défaut</th>
+                    <th className="px-4 py-3">Connexion par défaut</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
-                )}
-                
-                {loading && tools.length === 0 ? (
-                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">Chargement...</td></tr>
-                ) : tools.map(tool => (
-                  <React.Fragment key={tool.id}>
-                    {editingId === tool.id ? (
-                      <tr className="bg-blue-50/30">
-                        <td className="px-4 py-3" colSpan={4}>
-                          <EditForm form={editForm} onChange={setEditForm} onCancel={() => setEditingId(null)} onSave={() => handleSave(editForm)} />
-                        </td>
-                      </tr>
-                    ) : (
-                      <tr className="hover:bg-slate-50/50 group transition-colors">
-                        <td className="px-4 py-3 font-medium text-slate-800">{tool.french_designation || tool.type}</td>
-                        <td className="px-4 py-3">{tool.default_od || "-"}</td>
-                        <td className="px-4 py-3">{tool.default_custom_type || "-"}</td>
-                        <td className="px-4 py-3 text-right space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {canAddOrEdit && (
-                            <button onClick={() => startEdit(tool)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded" title="Modifier">
-                              <PenLine className="w-4 h-4" />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button onClick={() => handleDelete(tool.id!)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Supprimer">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                </thead>
+                <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+                  <tbody className="divide-y divide-slate-100">
+                    {editingId && editForm.id === undefined && (
+                      <tr className="bg-orange-50/50">
+                        <td className="px-4 py-3" colSpan={5}>
+                          <EditForm form={editForm} onChange={setEditForm} onCancel={() => setEditingId(null)} onSave={() => handleSave(editForm)} isNew />
                         </td>
                       </tr>
                     )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
+                    
+                    {loading && tools.length === 0 ? (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-400">Chargement...</td></tr>
+                    ) : tools.map((tool, index) => (
+                      <SortableToolRow
+                        key={tool.id || `tool-${index}`}
+                        tool={tool}
+                        index={index}
+                        total={tools.length}
+                        isEditing={editingId === tool.id}
+                        editForm={editForm}
+                        canAddOrEdit={canAddOrEdit}
+                        canDelete={canDelete}
+                        onStartEdit={startEdit}
+                        onDelete={handleDelete}
+                        onMoveUp={handleMoveUp}
+                        onMoveDown={handleMoveDown}
+                        setEditForm={setEditForm}
+                        onSave={handleSave}
+                        onCancel={() => setEditingId(null)}
+                      />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </table>
+            </DndContext>
           </div>
 
         </div>
