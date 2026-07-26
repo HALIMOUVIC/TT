@@ -663,11 +663,18 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                 <div className="text-black font-extrabold text-[10px] mt-0.5">({well.purpose === 'PPG' ? 'PPG' : 'PPH'})</div>
               </div>
             </div>
-            <div className="col-span-3 border-r border-black p-1 flex flex-col justify-between items-center text-center">
-              <span className="text-[9.5px] font-bold text-black font-mono block self-start">COMPLETION DESIGN</span>
-              <span className="font-bold text-[11.5px] text-black uppercase">
-                {well.isAbandonProvisoire ? 'ABANDON PROVISOIRE (KILL STRING)' : (well.completionType || 'COMPLETION SIMPLE')}
-              </span>
+            <div className="col-span-3 border-r border-black p-1 flex flex-col justify-center items-center text-center">
+              {well.isAbandonProvisoire ? (
+                <>
+                  <span className="font-extrabold text-[12px] text-black uppercase leading-tight tracking-wide">ABANDON PROVISOIRE</span>
+                  <span className="font-bold text-[11px] text-black">(KILL STRING)</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[9.5px] font-bold text-black font-mono block self-start">COMPLETION DESIGN</span>
+                  <span className="font-bold text-[11.5px] text-black uppercase">{well.completionType || 'COMPLETION SIMPLE'}</span>
+                </>
+              )}
             </div>
             <div className="col-span-2 p-1 flex flex-col justify-between items-center text-center">
               <span className="text-[9.5px] font-bold text-black font-mono block self-start">RESERVOIR :</span>
