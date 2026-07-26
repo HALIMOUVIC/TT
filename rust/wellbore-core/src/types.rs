@@ -17,6 +17,7 @@ pub struct CasingString {
     pub drilled_depth: f64,
     pub top_of_cement: Option<f64>,
     pub top_of_liner: Option<f64>,
+    pub top_of_fonde: Option<f64>,
     pub grade: Option<String>,
     pub weight: Option<f64>,
     pub connection: Option<String>,

@@ -53,6 +53,11 @@ pub struct CasingDrawData {
     pub has_liner: bool,
     pub tol_val: Option<f64>,
     pub y_tol: Option<f64>,
+    #[serde(rename = "hasTF")]
+    pub has_tf: bool,
+    pub tf_val: Option<f64>,
+    #[serde(rename = "yTF")]
+    pub y_tf: Option<f64>,
     pub block_y: f64,
     pub prev_casing_r: f64,
     pub prev_shoe_y: f64,
@@ -288,6 +293,10 @@ pub fn compute_casings_layout(
                 None
             };
 
+            let has_tf = is_valid_optional_depth(casing.top_of_fonde);
+            let tf_val = if has_tf { casing.top_of_fonde } else { None };
+            let y_tf = if has_tf { Some(mapper.map(tf_val.unwrap_or(0.0))) } else { None };
+
             CasingDrawData {
                 casing_index,
                 casing_id: casing.id.clone(),
@@ -302,6 +311,9 @@ pub fn compute_casings_layout(
                 has_liner,
                 tol_val,
                 y_tol,
+                has_tf,
+                tf_val,
+                y_tf,
                 block_y: 0.0,
                 prev_casing_r: 0.0,
                 prev_shoe_y: 0.0,
@@ -586,6 +598,18 @@ pub fn compute_left_casing_labels(
                         resolved_y: 0.0,
                         label_type: "Liner Hanger".to_string(),
                         depth_str: format!("{} m", format_depth(Some(tol))),
+                    });
+                }
+            }
+            if cd.has_tf {
+                if let (Some(tf), Some(y_tf)) = (cd.tf_val, cd.y_tf) {
+                    raw.push(ResolvedLeftLabel {
+                        text: format!("TF {csg_size} : {} m", format_depth(Some(tf))),
+                        target_y: y_tf,
+                        target_x: x_center - (cd.borehole_r + cd.casing_r) / 2.0,
+                        resolved_y: 0.0,
+                        label_type: "Top Fonde".to_string(),
+                        depth_str: format!("{} m", format_depth(Some(tf))),
                     });
                 }
             }

@@ -35,6 +35,16 @@ pub fn calculate_key_anchors(well: &WellData, max_depth: f64, y_start: f64, y_en
                 depths.push(toc);
             }
         }
+        if let Some(tol) = c.top_of_liner {
+            if !tol.is_nan() {
+                depths.push(tol);
+            }
+        }
+        if let Some(tf) = c.top_of_fonde {
+            if !tf.is_nan() {
+                depths.push(tf);
+            }
+        }
     }
     for t in &well.tubings {
         if !t.bottom_depth.is_nan() {
