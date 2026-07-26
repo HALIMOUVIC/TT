@@ -151,6 +151,7 @@ export function initDb(userDataPath: string): Database.Database {
       default_custom_type TEXT DEFAULT 'EU',
       default_min_id TEXT DEFAULT '',
       french_designation TEXT NOT NULL,
+      display_order INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -186,6 +187,7 @@ export function runMigrations(): void {
   try { d.prepare('ALTER TABLE casing_strings ADD COLUMN top_of_fonde REAL').run(); } catch (_) { /* column already exists */ }
   try { d.prepare('ALTER TABLE well_history ADD COLUMN updated_at TEXT').run(); } catch (_) { /* column already exists */ }
   try { d.prepare('ALTER TABLE well_history ADD COLUMN edited_by TEXT').run(); } catch (_) { /* column already exists */ }
+  try { d.prepare('ALTER TABLE custom_tool_types ADD COLUMN display_order INTEGER DEFAULT 0').run(); } catch (_) { /* column already exists */ }
 }
 
 
@@ -256,14 +258,16 @@ export function upsertPerforation(p: any): void {
 }
 
 export function upsertToolType(t: any): void {
+  const tool = { display_order: 0, ...t };
   getDb().prepare(`
-    INSERT INTO custom_tool_types (id,type,default_name,default_od,default_custom_type,default_min_id,french_designation)
-    VALUES (@id,@type,@default_name,@default_od,@default_custom_type,@default_min_id,@french_designation)
+    INSERT INTO custom_tool_types (id,type,default_name,default_od,default_custom_type,default_min_id,french_designation,display_order)
+    VALUES (@id,@type,@default_name,@default_od,@default_custom_type,@default_min_id,@french_designation,@display_order)
     ON CONFLICT(type) DO UPDATE SET
       default_name=excluded.default_name, default_od=excluded.default_od,
       default_custom_type=excluded.default_custom_type, default_min_id=excluded.default_min_id,
-      french_designation=excluded.french_designation
-  `).run(t);
+      french_designation=excluded.french_designation,
+      display_order=excluded.display_order
+  `).run(tool);
 }
 
 export function upsertHistory(h: any): void {

@@ -578,18 +578,43 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
   // Custom Tool Types — SQLite CRUD
   app.get("/api/supabase/custom-tool-types", (req, res) => {
     try {
-      const data = getDb().prepare("SELECT * FROM custom_tool_types ORDER BY type ASC").all();
+      const data = getDb().prepare("SELECT * FROM custom_tool_types ORDER BY display_order ASC, rowid ASC").all();
       res.json({ success: true, data });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to fetch tool types" });
     }
   });
 
+  app.put("/api/supabase/custom-tool-types/reorder", (req, res) => {
+    try {
+      const { items } = req.body; // array of tool objects or { id, display_order }
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ success: false, error: "Invalid items format" });
+      }
+
+      const stmt = getDb().prepare("UPDATE custom_tool_types SET display_order = ? WHERE id = ?");
+      const transaction = getDb().transaction((list: any[]) => {
+        list.forEach((item, index) => {
+          if (item.id) {
+            stmt.run(index, item.id);
+          }
+        });
+      });
+      transaction(items);
+
+      const data = getDb().prepare("SELECT * FROM custom_tool_types ORDER BY display_order ASC, rowid ASC").all();
+      res.json({ success: true, data });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ success: false, error: "Failed to reorder tool types" });
+    }
+  });
+
   app.post("/api/supabase/custom-tool-types", (req, res) => {
     try {
-      const { type, default_name, default_od, default_custom_type, default_min_id, french_designation } = req.body;
+      const { type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order } = req.body;
       const id = `tooltype-${Date.now()}`;
-      upsertToolType({ id, type, default_name, default_od, default_custom_type, default_min_id, french_designation });
+      upsertToolType({ id, type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order: display_order || 0 });
       const data = getDb().prepare("SELECT * FROM custom_tool_types WHERE id = ?").get(id);
       res.json({ success: true, data });
     } catch (error) {
@@ -600,13 +625,14 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
   app.put("/api/supabase/custom-tool-types/:id", (req, res) => {
     try {
       const { id } = req.params;
-      const { type, default_name, default_od, default_custom_type, default_min_id, french_designation } = req.body;
+      const { type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order } = req.body;
       const existing = getDb().prepare("SELECT id FROM custom_tool_types WHERE id = ?").get(id);
       if (!existing) return res.status(404).json({ success: false, error: "Tool type not found" });
       getDb().prepare(`UPDATE custom_tool_types SET type=@type, default_name=@default_name, default_od=@default_od,
         default_custom_type=@default_custom_type, default_min_id=@default_min_id, french_designation=@french_designation,
+        display_order=COALESCE(@display_order, display_order),
         updated_at=datetime('now') WHERE id=@id`
-      ).run({ id, type, default_name, default_od, default_custom_type, default_min_id, french_designation });
+      ).run({ id, type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order });
       const data = getDb().prepare("SELECT * FROM custom_tool_types WHERE id = ?").get(id);
       res.json({ success: true, data });
     } catch (error: any) {

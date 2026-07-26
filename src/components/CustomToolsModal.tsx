@@ -174,6 +174,20 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
     fetchTools();
   }, []);
 
+  const saveOrder = async (reordered: CustomTool[]) => {
+    updateTubingComponentMatrix(reordered);
+    if (onUpdated) onUpdated();
+    try {
+      await fetch('/api/supabase/custom-tool-types/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: reordered })
+      });
+    } catch (err) {
+      console.error("Failed to persist tool reordering:", err);
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
@@ -182,8 +196,7 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
         const newIndex = items.findIndex((item, idx) => (item.id || `tool-${idx}`) === over.id);
         if (oldIndex < 0 || newIndex < 0) return items;
         const reordered = arrayMove(items, oldIndex, newIndex);
-        updateTubingComponentMatrix(reordered);
-        if (onUpdated) onUpdated();
+        saveOrder(reordered);
         return reordered;
       });
     }
@@ -193,8 +206,7 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
     if (index <= 0) return;
     setTools((items) => {
       const reordered = arrayMove(items, index, index - 1);
-      updateTubingComponentMatrix(reordered);
-      if (onUpdated) onUpdated();
+      saveOrder(reordered);
       return reordered;
     });
   };
@@ -203,8 +215,7 @@ export default function CustomToolsModal({ onUpdated, canAddOrEdit = true, canDe
     if (index >= tools.length - 1) return;
     setTools((items) => {
       const reordered = arrayMove(items, index, index + 1);
-      updateTubingComponentMatrix(reordered);
-      if (onUpdated) onUpdated();
+      saveOrder(reordered);
       return reordered;
     });
   };
