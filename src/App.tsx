@@ -746,9 +746,9 @@ export default function App() {
       >
         <div className="flex flex-col flex-1">
           <div className="p-6 border-b border-slate-800/40 flex items-center gap-4 bg-[#0c1222]">
-            <img src="/logo.svg" className="w-14 h-14 object-contain rounded-xl shadow-md" alt="Logo" />
+            <img src="/logo.svg" className="w-20 h-20 object-contain rounded-2xl shadow-lg" alt="Logo" />
             <div>
-              <h1 className="text-white font-black tracking-wider text-base font-sans uppercase">
+              <h1 className="text-white font-black tracking-wider text-lg font-sans uppercase">
                 Wellbore Pro
               </h1>
             </div>
