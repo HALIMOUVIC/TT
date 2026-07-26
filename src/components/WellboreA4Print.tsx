@@ -665,7 +665,9 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
             </div>
             <div className="col-span-3 border-r border-black p-1 flex flex-col justify-between items-center text-center">
               <span className="text-[9.5px] font-bold text-black font-mono block self-start">COMPLETION DESIGN</span>
-              <span className="font-bold text-[11.5px] text-black uppercase">{well.completionType || 'COMPLETION SIMPLE'}</span>
+              <span className="font-bold text-[11.5px] text-black uppercase">
+                {well.isAbandonProvisoire ? 'ABANDON PROVISOIRE (KILL STRING)' : (well.completionType || 'COMPLETION SIMPLE')}
+              </span>
             </div>
             <div className="col-span-2 p-1 flex flex-col justify-between items-center text-center">
               <span className="text-[9.5px] font-bold text-black font-mono block self-start">RESERVOIR :</span>

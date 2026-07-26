@@ -97,7 +97,19 @@ export default function WellMetadataForm({ well, onChange }: WellMetadataFormPro
 
         {/* Completion Type */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 mb-1" htmlFor="well_completion">Completion Type</label>
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-semibold text-slate-600" htmlFor="well_completion">Completion Type</label>
+            <label className="flex items-center gap-1.5 text-xs font-bold text-rose-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="well_abandon_toggle"
+                checked={!!well.isAbandonProvisoire}
+                onChange={(e) => handleChange('isAbandonProvisoire', e.target.checked)}
+                className="w-3.5 h-3.5 text-rose-600 border-slate-300 rounded focus:ring-rose-500 cursor-pointer"
+              />
+              <span>Abandon provisoire (kill string)</span>
+            </label>
+          </div>
           <input
             type="text"
             id="well_completion"

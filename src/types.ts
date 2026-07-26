@@ -106,6 +106,7 @@ export interface WellData {
   casings: CasingString[];
   tubings: TubingComponent[];
   perforations: PerforationZone[];
+  isAbandonProvisoire?: boolean;
   isCasingsCleared?: boolean;
   observations?: string;
   folio?: string;

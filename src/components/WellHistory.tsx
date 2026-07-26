@@ -165,7 +165,9 @@ export default function WellHistory({
                 <div className="flex items-center gap-2 shrink-0">
                   <div className="text-right hidden sm:block">
                     <p className="text-xs text-slate-500 font-medium">{record.snapshot?.name}</p>
-                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">{record.snapshot?.completionType}</p>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">
+                      {record.snapshot?.isAbandonProvisoire ? 'ABANDON PROVISOIRE (KILL STRING)' : record.snapshot?.completionType}
+                    </p>
                   </div>
                   <button
                     type="button"

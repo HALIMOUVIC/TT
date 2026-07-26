@@ -1853,7 +1853,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
               fill="#64748b"
               fontWeight="semibold"
             >
-              {well.completionType}
+              {well.isAbandonProvisoire ? 'Abandon provisoire (kill string)' : well.completionType}
             </text>
           </g>
         </svg>

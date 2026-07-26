@@ -26,6 +26,8 @@ const getColorFilter = (color: string) => {
       return "brightness(0) saturate(100%) invert(53%) sepia(91%) saturate(382%) hue-rotate(114deg) brightness(96%) contrast(89%)";
     case "#8b5cf6": // Purple
       return "brightness(0) saturate(100%) invert(39%) sepia(91%) saturate(2243%) hue-rotate(247deg) brightness(98%) contrast(94%)";
+    case "#ef4444": // Red / Rose
+      return "brightness(0) saturate(100%) invert(38%) sepia(85%) saturate(2468%) hue-rotate(334deg) brightness(98%) contrast(93%)";
     default:
       return "none";
   }
@@ -137,6 +139,8 @@ export default function WellDashboard({ wells, activeWellId, onSelectWell, onNav
       && (filterP === "ALL" || p === filterP);
   });
 
+  const abandonedCount = wells.filter(w => w.isAbandonProvisoire || (w.completionType || "").toLowerCase().includes("abandon")).length;
+
   /* KPI cards — imgSrc points to actual files in /public/img/
      The BUILD_TS query param busts the browser cache on every
      server restart so swapping a file always shows the new icon. */
@@ -168,13 +172,22 @@ export default function WellDashboard({ wells, activeWellId, onSelectWell, onNav
       bg: "#faf5ff",
       border: "#ddd6fe",
     },
+    {
+      label: "Puits Abandonnés",
+      value: String(abandonedCount),
+      sub: "abandon provisoire / kill string",
+      imgSrc: `/img/mandrin.svg?t=${BUILD_TS}`,
+      accent: "#ef4444",
+      bg: "#fff1f2",
+      border: "#fecdd3",
+    },
   ];
 
   return (
     <div className="space-y-5" style={{ fontFamily: "'Inter',sans-serif" }} id="well_dashboard_root">
 
       {/* ══ KPI CARDS ══ */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3" id="dashboard_stats_grid">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3" id="dashboard_stats_grid">
         {kpis.map(({ label, value, sub, imgSrc, accent, bg, border }) => (
           <div key={label}
             className="rounded-2xl p-4 relative overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-default bg-white"
