@@ -139,9 +139,9 @@ export default function Login({ onLogin }: LoginProps) {
 
           <div className="absolute -top-[30%] -left-[10%] w-[70%] h-[70%] rounded-full bg-[#f97316] blur-[150px] opacity-30 pointer-events-none"></div>
 
-          <div className="relative z-10 flex items-center gap-3">
-            <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
-            <span className="text-xl font-black text-white tracking-tight">Wellbore Pro</span>
+          <div className="relative z-10 flex items-center gap-4">
+            <img src="/logo.svg" className="w-16 h-16 object-contain rounded-2xl shadow-xl" alt="Logo" />
+            <span className="text-2xl font-black text-white tracking-tight">Wellbore Pro</span>
           </div>
 
           <div className="relative z-10 max-w-md">
@@ -161,9 +161,9 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Right Side - Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 xl:p-24 relative">
           <div className="w-full max-w-md bg-white p-8 sm:p-10 rounded-3xl shadow-2xl space-y-10 border border-slate-100">
-            <div className="flex lg:hidden items-center gap-3 mb-8">
-              <img src="/logo.svg" className="w-10 h-10 object-contain rounded-xl shadow-lg" alt="Logo" />
-              <span className="text-xl font-black text-slate-900 tracking-tight">Wellbore Pro</span>
+            <div className="flex lg:hidden items-center gap-4 mb-8">
+              <img src="/logo.svg" className="w-14 h-14 object-contain rounded-xl shadow-lg" alt="Logo" />
+              <span className="text-2xl font-black text-slate-900 tracking-tight">Wellbore Pro</span>
             </div>
 
             <div>
