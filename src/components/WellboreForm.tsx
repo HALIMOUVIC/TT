@@ -1152,56 +1152,6 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
           </div>
         )}
 
-        {/* Existing Bridge Plugs (B.P) list when form is closed */}
-        {(well.tubings || []).filter(t => isBridgePlugItem(t)).length > 0 && (
-          <div className="border-t border-slate-200 pt-3 space-y-1.5">
-            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="bg-amber-600 text-white rounded px-1 py-0.5 text-[9px]">BP</span>
-              Bridge Plug(s) (B.P) Enregistré(s)
-            </p>
-            {(well.tubings || []).filter(t => isBridgePlugItem(t)).map(bp => (
-              <div key={bp.id} className="flex items-center justify-between bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-2">
-                <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-                  <span className="font-bold text-amber-900 bg-amber-200/80 rounded px-1.5 py-0.5 text-[10px]">{bp.name}</span>
-                  <span className="text-slate-700">Taille: <strong>{bp.od || '7"'}</strong></span>
-                  <span className="text-amber-800 font-bold">Type: {bp.customType || 'PERMANENT'}</span>
-                  {bp.length ? <span className="text-slate-700">L: <strong>{bp.length}m</strong></span> : null}
-                  <span className="text-emerald-800 font-bold">Cote Product: {bp.bottomDepth}m</span>
-                  {bp.observations ? <span className="text-slate-500 ml-1">({bp.observations})</span> : null}
-                </div>
-                <div className="flex items-center gap-2">
-                  {canAddOrEdit && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowBPForm(true);
-                        setShowBCForm(false);
-                        setEditingBPId(bp.id);
-                        setNewBP({
-                          designation: bp.name || 'Bridge plug',
-                          size: bp.od || '7"',
-                          type: bp.customType || 'PERMANENT',
-                          length: bp.length || 0,
-                          bottomDepth: bp.bottomDepth,
-                          observations: bp.observations || ''
-                        });
-                      }}
-                      className="text-sky-600 hover:text-sky-800 p-1"
-                      title="Modifier"
-                    >
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button type="button" onClick={() => removeTubing(bp.id)} className="text-red-400 hover:text-red-600 p-1" title="Supprimer">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
       )}
 
