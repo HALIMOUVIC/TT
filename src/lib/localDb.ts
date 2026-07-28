@@ -205,6 +205,20 @@ export function initDb(userDataPath: string): Database.Database {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS bridge_plugs (
+      id TEXT PRIMARY KEY,
+      well_id TEXT NOT NULL REFERENCES wells(id) ON DELETE CASCADE,
+      designation TEXT DEFAULT 'Bridge plug',
+      size TEXT DEFAULT '7"',
+      type TEXT DEFAULT 'PERMANENT',
+      length REAL DEFAULT 0,
+      bottom_depth REAL NOT NULL,
+      observations TEXT,
+      display_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS sync_meta (
       key TEXT PRIMARY KEY,
       value TEXT
@@ -395,6 +409,91 @@ export function runMigrations(): void {
       d.prepare(`ALTER TABLE cement_plugs ADD COLUMN ${col.name} ${col.type}`).run();
     } catch (_) { /* column already exists */ }
   }
+
+  // Migrate bridge_plugs table (create if not exists & handle legacy 'depth' column)
+  try {
+    const tableInfo = d.prepare("PRAGMA table_info(bridge_plugs)").all() as any[];
+    const hasDepth = tableInfo.some((c: any) => c.name === "depth");
+    if (hasDepth) {
+      d.exec(`
+        CREATE TABLE bridge_plugs_new (
+          id TEXT PRIMARY KEY,
+          well_id TEXT NOT NULL REFERENCES wells(id) ON DELETE CASCADE,
+          designation TEXT DEFAULT 'Bridge plug',
+          size TEXT DEFAULT '7"',
+          type TEXT DEFAULT 'PERMANENT',
+          length REAL DEFAULT 0,
+          bottom_depth REAL NOT NULL,
+          observations TEXT,
+          display_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO bridge_plugs_new (id, well_id, designation, size, type, length, bottom_depth, observations, display_order, created_at, updated_at)
+        SELECT id, well_id,
+          COALESCE(designation, 'Bridge plug'),
+          COALESCE(size, '7"'),
+          COALESCE(type, 'PERMANENT'),
+          COALESCE(length, 0),
+          COALESCE(depth, 0),
+          observations,
+          COALESCE(display_order, 0),
+          COALESCE(created_at, datetime('now')),
+          COALESCE(updated_at, datetime('now'))
+        FROM bridge_plugs;
+        DROP TABLE bridge_plugs;
+        ALTER TABLE bridge_plugs_new RENAME TO bridge_plugs;
+      `);
+    } else {
+      d.exec(`
+        CREATE TABLE IF NOT EXISTS bridge_plugs (
+          id TEXT PRIMARY KEY,
+          well_id TEXT NOT NULL REFERENCES wells(id) ON DELETE CASCADE,
+          designation TEXT DEFAULT 'Bridge plug',
+          size TEXT DEFAULT '7"',
+          type TEXT DEFAULT 'PERMANENT',
+          length REAL DEFAULT 0,
+          bottom_depth REAL NOT NULL,
+          observations TEXT,
+          display_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+    }
+  } catch (_) {
+    d.exec(`
+      CREATE TABLE IF NOT EXISTS bridge_plugs (
+        id TEXT PRIMARY KEY,
+        well_id TEXT NOT NULL REFERENCES wells(id) ON DELETE CASCADE,
+        designation TEXT DEFAULT 'Bridge plug',
+        size TEXT DEFAULT '7"',
+        type TEXT DEFAULT 'PERMANENT',
+        length REAL DEFAULT 0,
+        bottom_depth REAL NOT NULL,
+        observations TEXT,
+        display_order INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
+  }
+
+  const bridgeCols = [
+    { name: "designation", type: "TEXT" },
+    { name: "size", type: "TEXT" },
+    { name: "type", type: "TEXT" },
+    { name: "length", type: "REAL" },
+    { name: "bottom_depth", type: "REAL" },
+    { name: "observations", type: "TEXT" },
+    { name: "display_order", type: "INTEGER" },
+    { name: "updated_at", type: "TEXT" }
+  ];
+  for (const col of bridgeCols) {
+    try {
+      d.prepare(`ALTER TABLE bridge_plugs ADD COLUMN ${col.name} ${col.type}`).run();
+    } catch (_) { /* column already exists */ }
+  }
 }
 
 
@@ -541,5 +640,28 @@ export function upsertHistory(h: any): void {
     created_at: h.created_at || new Date().toISOString(),
     updated_at: updated_at,
     edited_by: edited_by
+  });
+}
+
+export function upsertBridgePlug(bp: any): void {
+  const d = getDb();
+  d.prepare(`
+    INSERT INTO bridge_plugs (id, well_id, designation, size, type, length, bottom_depth, observations, display_order)
+    VALUES (@id, @well_id, @designation, @size, @type, @length, @bottom_depth, @observations, @display_order)
+    ON CONFLICT(id) DO UPDATE SET
+      designation=excluded.designation, size=excluded.size, type=excluded.type,
+      length=excluded.length, bottom_depth=excluded.bottom_depth,
+      observations=excluded.observations, display_order=excluded.display_order,
+      updated_at=datetime('now')
+  `).run({
+    id: bp.id,
+    well_id: bp.well_id,
+    designation: bp.designation || bp.name || 'Bridge plug',
+    size: bp.size || bp.od || '7"',
+    type: bp.type || bp.customType || 'PERMANENT',
+    length: Number(bp.length) || 0,
+    bottom_depth: Number(bp.bottom_depth || bp.bottomDepth) || 0,
+    observations: bp.observations || '',
+    display_order: bp.display_order || 0
   });
 }

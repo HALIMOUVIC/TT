@@ -10,7 +10,7 @@ import ws from "ws";
 import Database from "better-sqlite3";
 import {
   initDb, getDb, wasEverSynced, markSynced, runMigrations,
-  upsertEmployee, upsertWell, upsertCasing, upsertTubing, upsertPerforation, upsertToolType, upsertHistory, upsertCementPlug
+  upsertEmployee, upsertWell, upsertCasing, upsertTubing, upsertPerforation, upsertToolType, upsertHistory, upsertCementPlug, upsertBridgePlug
 } from "./src/lib/localDb";
 
 // Polyfill WebSocket for older Node versions (like Node 20 inside Electron 33)
@@ -297,6 +297,18 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
   initDb(userDataPath);
   runMigrations();
 
+  function isBridgePlugTool(t: { name?: string; type?: string; custom_type?: string; customType?: string; designation?: string }) {
+    const effectiveType = (t.customType || t.custom_type || t.type || '').toLowerCase();
+    const name = (t.name || t.designation || '').toLowerCase();
+    return (
+      effectiveType === 'bridge plug' ||
+      effectiveType.includes('bridge') ||
+      name.includes('bridge') ||
+      name.includes('b.p') ||
+      name.includes('bp')
+    );
+  }
+
   // Try to sync from Supabase on first ever run (one-time migration)
   async function tryInitialSupabaseSync() {
     if (wasEverSynced()) {
@@ -314,7 +326,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       const { createClient } = await import("@supabase/supabase-js");
       const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
-      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes] = await Promise.all([
+      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes, bridgeRes] = await Promise.all([
         sb.from("employees").select("*"),
         sb.from("wells").select("*"),
         sb.from("casing_strings").select("*"),
@@ -322,7 +334,8 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         sb.from("perforation_zones").select("*"),
         sb.from("custom_tool_types").select("*"),
         sb.from("well_history").select("*"),
-        sb.from("cement_plugs").select("*")
+        sb.from("cement_plugs").select("*"),
+        sb.from("bridge_plugs").select("*")
       ]);
 
       const db = getDb();
@@ -335,6 +348,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         for (const tt of toolsRes.data || []) upsertToolType(tt);
         for (const h of histRes.data || []) upsertHistory(h);
         for (const cp of cementRes.data || []) upsertCementPlug(cp);
+        for (const bp of bridgeRes.data || []) upsertBridgePlug(bp);
       });
       syncAll();
       markSynced();
@@ -400,14 +414,15 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         sb.from("perforation_zones").select("*"),
         sb.from("custom_tool_types").select("*"),
         sb.from("well_history").select("*"),
-        sb.from("cement_plugs").select("*")
+        sb.from("cement_plugs").select("*"),
+        sb.from("bridge_plugs").select("*")
       ]);
 
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Supabase proxy/network request timed out (3s limit)")), 3000)
       );
 
-      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes] = await Promise.race([
+      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes, bridgeRes] = await Promise.race([
         syncPromise,
         timeoutPromise
       ]);
@@ -468,6 +483,15 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
           for (const cp of (cementRes as any).data) upsertCementPlug(cp);
           console.log("DEBUG: Synced cement plugs:", (cementRes as any).data.length);
         }
+        if (bridgeRes && (bridgeRes as any).data) {
+          try {
+            db.prepare("DELETE FROM bridge_plugs").run();
+            for (const bp of (bridgeRes as any).data) upsertBridgePlug(bp);
+            console.log("DEBUG: Synced bridge plugs:", (bridgeRes as any).data.length);
+          } catch (err) {
+            console.warn("bridge_plugs sync warning:", err);
+          }
+        }
       });
       syncAll();
       markSynced();
@@ -478,7 +502,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
   }
 
   // Helper to build a well object from SQLite rows
-  function buildWellFromRows(row: any, casingsData: any[], tubingsData: any[], perfsData: any[], historyData: any[], cementPlugsData: any[] = []) {
+  function buildWellFromRows(row: any, casingsData: any[], tubingsData: any[], perfsData: any[], historyData: any[], cementPlugsData: any[] = [], bridgePlugsData: any[] = []) {
     const wellHistory = historyData.filter((h: any) => h.well_id === row.id);
     let maxFolio = 0;
     for (const h of wellHistory) {
@@ -487,6 +511,30 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
     const trueFolioStr = String(maxFolio).padStart(2, "0");
     const trueFolioToCancelStr = String(Math.max(0, maxFolio - 1)).padStart(2, "0");
+
+    const wellBridgePlugs = bridgePlugsData.filter((bp: any) => bp.well_id === row.id)
+      .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+      .map((bp: any) => ({
+        id: bp.id,
+        name: bp.designation || bp.name || 'Bridge plug',
+        type: 'Bridge Plug',
+        customType: bp.type || bp.custom_type || 'PERMANENT',
+        od: bp.size || bp.od || '7"',
+        length: Number(bp.length) || 0,
+        bottomDepth: Number(bp.bottom_depth) || 0,
+        observations: bp.observations || '',
+        isCoteProductAdded: true,
+        qty: '01'
+      }));
+
+    const standardTubings = tubingsData.filter((t: any) => t.well_id === row.id && !isBridgePlugTool(t))
+      .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+      .map((t: any) => ({
+        id: t.id, name: t.name, type: t.type, od: t.od,
+        length: Number(t.length) || 0, bottomDepth: Number(t.bottom_depth) || 0,
+        isCoteProductAdded: !!t.is_cote_product_added,
+        observations: t.observations, qty: t.qty, customType: t.custom_type, minId: t.min_id
+      }));
 
     return {
       id: row.id,
@@ -546,14 +594,8 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
           grade: c.grade, weight: c.weight != null ? Number(c.weight) : undefined,
           connection: c.connection, observations: c.observations
         })),
-      tubings: tubingsData.filter((t: any) => t.well_id === row.id)
-        .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
-        .map((t: any) => ({
-          id: t.id, name: t.name, type: t.type, od: t.od,
-          length: Number(t.length) || 0, bottomDepth: Number(t.bottom_depth) || 0,
-          isCoteProductAdded: !!t.is_cote_product_added,
-          observations: t.observations, qty: t.qty, customType: t.custom_type, minId: t.min_id
-        })),
+      tubings: standardTubings.concat(wellBridgePlugs),
+      bridgePlugs: wellBridgePlugs,
       perforations: perfsData.filter((p: any) => p.well_id === row.id)
         .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
         .map((p: any) => ({
@@ -743,9 +785,10 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
               });
             }
 
-            // C. Tubings
+            // C. Tubings (clean standard components, excluding Bridge Plugs)
             db.prepare("DELETE FROM tubing_components WHERE well_id = ?").run(well.id);
-            for (const [index, t] of (well.tubings || []).entries()) {
+            const cleanTubingsLocal = (well.tubings || []).filter((t: any) => !isBridgePlugTool(t));
+            for (const [index, t] of cleanTubingsLocal.entries()) {
               upsertTubing({
                 id: t.id || `tubing-${well.id}-${index}-${Date.now()}`,
                 well_id: well.id, name: t.name || "Tubing Component", type: t.type || "Tubing",
@@ -777,6 +820,25 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 top_depth: Number(cp.topDepth) || 0,
                 bottom_depth: Number(cp.bottomDepth) || 0,
                 observations: cp.observations || '',
+                display_order: index + 1
+              });
+            }
+
+            // E2. Bridge Plugs (B.P) -> Save into bridge_plugs table
+            db.prepare("DELETE FROM bridge_plugs WHERE well_id = ?").run(well.id);
+            const bridgePlugsToSaveLocal = (well.bridgePlugs || []).concat(
+              (well.tubings || []).filter((t: any) => isBridgePlugTool(t))
+            );
+            for (const [index, bp] of bridgePlugsToSaveLocal.entries()) {
+              upsertBridgePlug({
+                id: bp.id || `bp-${well.id}-${index}-${Date.now()}`,
+                well_id: well.id,
+                designation: bp.name || bp.designation || 'Bridge plug',
+                size: bp.od || bp.size || '7"',
+                type: bp.customType || bp.type || 'PERMANENT',
+                length: Number(bp.length) || 0,
+                bottom_depth: Number(bp.bottomDepth || bp.bottom_depth) || 0,
+                observations: bp.observations || '',
                 display_order: index + 1
               });
             }
@@ -878,9 +940,11 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 }
               }
 
+              // Tubings (clean standard components, excluding Bridge Plugs)
               await sb.from("tubing_components").delete().eq("well_id", well.id);
-              if (well.tubings && well.tubings.length > 0) {
-                const tubingsToInsert = well.tubings.map((t: any, index: number) => ({
+              const cleanTubingsSupabase = (well.tubings || []).filter((t: any) => !isBridgePlugTool(t));
+              if (cleanTubingsSupabase.length > 0) {
+                const tubingsToInsert = cleanTubingsSupabase.map((t: any, index: number) => ({
                   id: t.id || `tubing-${well.id}-${index}-${Date.now()}`,
                   well_id: well.id,
                   name: t.name || "Tubing Component",
@@ -935,6 +999,27 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 }));
                 const { error: bcErr } = await sb.from("cement_plugs").insert(plugsToInsert);
                 if (bcErr) console.warn("cement_plugs insert warning:", bcErr.message);
+              }
+
+              // Bridge Plugs (B.P) -> Save into bridge_plugs table in Supabase!
+              await sb.from("bridge_plugs").delete().eq("well_id", well.id);
+              const bpToSaveSupabase = (well.bridgePlugs || []).concat(
+                (well.tubings || []).filter((t: any) => isBridgePlugTool(t))
+              );
+              if (bpToSaveSupabase.length > 0) {
+                const bpToInsert = bpToSaveSupabase.map((bp: any, index: number) => ({
+                  id: bp.id || `bp-${well.id}-${index}-${Date.now()}`,
+                  well_id: well.id,
+                  designation: bp.name || bp.designation || 'Bridge plug',
+                  size: bp.od || bp.size || '7"',
+                  type: bp.customType || bp.type || 'PERMANENT',
+                  length: Number(bp.length) || 0,
+                  bottom_depth: Number(bp.bottomDepth || bp.bottom_depth) || 0,
+                  observations: bp.observations || '',
+                  display_order: index + 1
+                }));
+                const { error: bpErr } = await sb.from("bridge_plugs").insert(bpToInsert);
+                if (bpErr) console.warn("bridge_plugs insert warning:", bpErr.message);
               }
 
               const snapshotStr = JSON.stringify(snapshotWell);
@@ -999,9 +1084,13 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       const perfsData = db.prepare("SELECT * FROM perforation_zones").all() as any[];
       const historyData = db.prepare("SELECT well_id, folio FROM well_history").all() as any[];
       const cementPlugsData = db.prepare("SELECT * FROM cement_plugs").all() as any[];
+      let bridgePlugsData: any[] = [];
+      try {
+        bridgePlugsData = db.prepare("SELECT * FROM bridge_plugs").all() as any[];
+      } catch (_) {}
 
       const reconstructedWells = wellsData.map((row: any) => {
-        return buildWellFromRows(row, casingsData, tubingsData, perfsData, historyData, cementPlugsData);
+        return buildWellFromRows(row, casingsData, tubingsData, perfsData, historyData, cementPlugsData, bridgePlugsData);
       });
 
       res.json({ success: true, wells: reconstructedWells });

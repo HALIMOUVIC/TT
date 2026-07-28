@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { WellData, CasingString, TubingComponent, TubingComponentType, CementPlug } from '../types';
+import { WellData, CasingString, TubingComponent, TubingComponentType, CementPlug, BridgePlug } from '../types';
 import { parseSizeToNumber, calculateCoteProducts, recalculateBottomDepths, getTubingTypeDefaults } from '../lib/wellboreEngine';
 import { Layers, Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Check, Edit, Disc, AlignJustify, GripVertical } from 'lucide-react';
 import {
@@ -425,6 +425,20 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
     const len = newBP.length !== undefined ? parseFloat(String(newBP.length)) : 0;
 
     let updatedTubings = [...(well.tubings || [])];
+    let updatedBridgePlugs = [...(well.bridgePlugs || [])];
+
+    const bpItem: BridgePlug = {
+      id: editingBPId || `bp-${Date.now()}`,
+      designation: newBP.designation || 'Bridge plug',
+      name: newBP.designation || 'Bridge plug',
+      size: newBP.size || '7"',
+      od: newBP.size || '7"',
+      type: newBP.type || 'PERMANENT',
+      customType: newBP.type || 'PERMANENT',
+      length: len,
+      bottomDepth: depth,
+      observations: newBP.observations || ''
+    };
 
     if (editingBPId) {
       updatedTubings = updatedTubings.map(t => {
@@ -443,10 +457,11 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
         }
         return t;
       });
+      updatedBridgePlugs = updatedBridgePlugs.map(bp => bp.id === editingBPId ? bpItem : bp);
       setEditingBPId(null);
     } else {
       const entry: TubingComponent = {
-        id: `bp-${Date.now()}`,
+        id: bpItem.id,
         name: newBP.designation || 'Bridge plug',
         type: 'Bridge Plug' as TubingComponentType,
         qty: '01',
@@ -458,11 +473,13 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
         observations: newBP.observations || ''
       };
       updatedTubings.push(entry);
+      updatedBridgePlugs.push(bpItem);
     }
 
     onChange({
       ...well,
       tubings: updatedTubings,
+      bridgePlugs: updatedBridgePlugs,
       updatedAt: new Date().toISOString()
     });
 

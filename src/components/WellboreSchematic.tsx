@@ -174,7 +174,32 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 1. Anchor-seal / Ancrage
+  // 1. Mandrin / Mandrel / Side-Pocket Mandrel (Checked FIRST to avoid "pocket" matching open hole!)
+  if (t.includes("mandrel") || t.includes("mandrin") || n.includes("mandrel") || n.includes("mandrin") || t.includes("spm") || n.includes("spm")) {
+    return <img src="/img/mandrin.svg" className="w-11 h-11 object-contain" alt="Mandrin" />;
+  }
+
+  // 2. Bridge Plug (B.P)
+  if (t.includes("bridge") || t.includes("b.p") || n.includes("bridge") || n.includes("b.p")) {
+    return <img src="/img/bridge-plug.svg" className="w-11 h-11 object-contain" alt="Bridge Plug" />;
+  }
+
+  // 3. Packer (PKR)
+  if (t.includes("packer") || t.includes("pkr") || n.includes("packer") || n.includes("pkr")) {
+    return <img src="/img/packer.svg" className="w-11 h-11 object-contain" alt="Packer" />;
+  }
+
+  // 4. Siège / Nipple / Seating Nipple
+  if (t.includes("nipple") || t.includes("siège") || t.includes("siege") || n.includes("nipple") || n.includes("siège") || n.includes("siege")) {
+    return <img src="/img/siege.svg" className="w-11 h-11 object-contain" alt="Siège" />;
+  }
+
+  // 5. Sliding Sleeve / Manchon coulissant
+  if (t.includes("sliding") || t.includes("sleeve") || t.includes("manchon") || n.includes("sliding") || n.includes("sleeve") || n.includes("manchon")) {
+    return <img src="/img/sliding-sleeve.svg" className="w-11 h-11 object-contain" alt="Sliding Sleeve" />;
+  }
+
+  // 6. Anchor-seal / Ancrage
   if (t.includes("anchor") || t.includes("ancrage") || t.includes("seal") || n.includes("anchor") || n.includes("ancrage") || n.includes("seal")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -192,7 +217,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 2. Reduction / Cross-over
+  // 7. Reduction / Cross-over
   if (t.includes("reduction") || t.includes("cross-over") || t.includes("crossover") || t.includes("swage") || t.includes("réduction") || n.includes("reduction") || n.includes("cross-over") || n.includes("crossover") || n.includes("swage") || n.includes("réduction")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -214,7 +239,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 3. Tubing Court / Pup Joint / Joint court
+  // 8. Tubing Court / Pup Joint / Joint court
   if (t.includes("pup") || t.includes("court") || n.includes("pup") || n.includes("court") || n.includes("joint court") || n.includes("tubing court")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -234,7 +259,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 4. Reservoir Perforations
+  // 9. Reservoir Perforations
   if (t.includes("perforation") || t.includes("reservoir") || n.includes("perforation") || n.includes("reservoir")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -263,7 +288,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 5. Cement
+  // 10. Cement (B.C / Bouchon de Ciment)
   if (t.includes("cement") || t.includes("ciment") || n.includes("cement") || n.includes("ciment")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -291,18 +316,18 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 5.5. Liner / Hanger / TOL / Top Fonde
+  // 11. Liner / Hanger / TOL / Top Fonde
   if (t.includes("liner") || t.includes("hanger") || t.includes("tol") || t.includes("fonde") || t.includes("tf") || n.includes("liner") || n.includes("hanger") || n.includes("tol") || n.includes("fonde") || n.includes("tf")) {
     return <img src="/img/liner.svg" className="w-11 h-11 object-contain" alt="Liner Hanger" />;
   }
 
-  // 6a. Tubing Production Sabot (e.g. name contains "sabot" or "shoe" but does NOT contain "casing" or "cuvelage")
+  // 12a. Tubing Production Sabot (e.g. name contains "sabot" or "shoe" but does NOT contain "casing" or "cuvelage")
   if ((t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) && 
       !n.includes("casing") && !n.includes("cuvelage") && !n.includes("tubage") && !t.includes("casing")) {
     return <img src="/img/sabot.svg" className="w-11 h-11 object-contain" alt="Sabot" />;
   }
 
-  // 6b. Casing Shoe (Sabot) — contains "casing", "cuvelage", or "tubage" (renders orange triangles)
+  // 12b. Casing Shoe (Sabot) — contains "casing", "cuvelage", or "tubage" (renders orange triangles)
   if (t.includes("shoe") || t.includes("sabot") || n.includes("shoe") || n.includes("sabot")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -320,7 +345,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 6. Casing
+  // 13. Casing
   if (t.includes("casing") || t.includes("cuvelage") || n.includes("casing") || n.includes("cuvelage")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -338,7 +363,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 7. Tubing
+  // 14. Tubing
   if (t.includes("tubing") || t.includes("colonne") || n.includes("tubing") || n.includes("colonne")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -355,8 +380,8 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 8. Borehole / Pocket / Foré
-  if (t.includes("drilled") || t.includes("pocket") || t.includes("borehole") || t.includes("foré") || n.includes("drilled") || n.includes("pocket") || n.includes("borehole") || n.includes("foré")) {
+  // 15. Borehole / Pocket / Drilled hole (Must NOT match Side-Pocket Mandrel)
+  if (t.includes("drilled") || t.includes("borehole") || t.includes("foré") || n.includes("drilled") || n.includes("borehole") || n.includes("foré") || ((t.includes("pocket") || n.includes("pocket")) && !t.includes("mandrel") && !t.includes("mandrin") && !n.includes("mandrel") && !n.includes("mandrin"))) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
         {/* Rock formation background with horizontal bedding lines */}
@@ -374,7 +399,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 9. Tailpipe / Tube de queue
+  // 16. Tailpipe / Tube de queue
   if (t.includes("tailpipe") || t.includes("queue") || n.includes("tailpipe") || n.includes("queue")) {
     return (
       <svg viewBox="0 0 60 60" className="w-12 h-12">
@@ -397,7 +422,7 @@ const renderRealToolGraphic = (type: string | undefined, name?: string) => {
     );
   }
 
-  // 10. Fallback dynamic image matcher
+  // 17. Fallback dynamic image matcher
   const config = resolveTubingConfig(type || name || "", name);
   if (config.renderType === "image" && config.imageUrl) {
     const viewBox = config.viewBox || "0 0 300 220";

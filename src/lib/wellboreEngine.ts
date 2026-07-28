@@ -135,30 +135,10 @@ export function calculatePerforationFields(
 }
 
 export function savePerforation(well: WellData, newPerf: Partial<PerforationZone>, editingPerfId: string | null) {
-  if (hasRealWasm()) {
-    try {
-      return JSON.parse(
-        wasmModule!.wasm_save_perforation(
-          JSON.stringify(well),
-          JSON.stringify(newPerf),
-          editingPerfId || ''
-        )
-      );
-    } catch (e) {
-      console.warn("WASM savePerforation failed, falling back to TS:", e);
-    }
-  }
   return tsCore.savePerforation(well, newPerf, editingPerfId);
 }
 
 export function removePerforationFromWell(well: WellData, id: string) {
-  if (hasRealWasm()) {
-    try {
-      return JSON.parse(wasmModule!.wasm_remove_perforation(JSON.stringify(well), id));
-    } catch (e) {
-      console.warn("WASM removePerforationFromWell failed, falling back to TS:", e);
-    }
-  }
   return tsCore.removePerforationFromWell(well, id);
 }
 

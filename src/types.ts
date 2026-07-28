@@ -59,6 +59,21 @@ export interface CementPlug {
   observations?: string;
 }
 
+export interface BridgePlug {
+  id: string;
+  wellId?: string;
+  designation?: string;
+  name?: string;
+  size?: string;
+  od?: string;
+  type?: string;
+  customType?: string;
+  length?: number;
+  bottomDepth: number;
+  observations?: string;
+  displayOrder?: number;
+}
+
 export interface PerforationZone {
   id: string;
   topDepth: number; // in meters
@@ -114,6 +129,7 @@ export interface WellData {
   tubings: TubingComponent[];
   perforations: PerforationZone[];
   cementPlugs?: CementPlug[];
+  bridgePlugs?: BridgePlug[];
   isAbandonProvisoire?: boolean;
   isCasingsCleared?: boolean;
   observations?: string;
