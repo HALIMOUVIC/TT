@@ -826,10 +826,20 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
 
             // E2. Bridge Plugs (B.P) -> Save into bridge_plugs table
             db.prepare("DELETE FROM bridge_plugs WHERE well_id = ?").run(well.id);
-            const bridgePlugsToSaveLocal = (well.bridgePlugs || []).concat(
-              (well.tubings || []).filter((t: any) => isBridgePlugTool(t))
-            );
+            // Collect BPs from both bridgePlugs array and tubings array, de-duplicate by id
+            const bpMapLocal = new Map<string, any>();
+            for (const bp of (well.bridgePlugs || [])) {
+              if (bp && bp.id) bpMapLocal.set(bp.id, bp);
+            }
+            for (const t of (well.tubings || [])) {
+              if (t && t.id && isBridgePlugTool(t) && !bpMapLocal.has(t.id)) {
+                bpMapLocal.set(t.id, t);
+              }
+            }
+            const bridgePlugsToSaveLocal = Array.from(bpMapLocal.values());
             for (const [index, bp] of bridgePlugsToSaveLocal.entries()) {
+              const bpBottomDepth = Number(bp.bottomDepth || bp.bottom_depth) || 0;
+              console.log(`DEBUG: Saving BP local id=${bp.id} bottom_depth=${bpBottomDepth}`);
               upsertBridgePlug({
                 id: bp.id || `bp-${well.id}-${index}-${Date.now()}`,
                 well_id: well.id,
@@ -837,7 +847,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 size: bp.od || bp.size || '7"',
                 type: bp.customType || bp.type || 'PERMANENT',
                 length: Number(bp.length) || 0,
-                bottom_depth: Number(bp.bottomDepth || bp.bottom_depth) || 0,
+                bottom_depth: bpBottomDepth,
                 observations: bp.observations || '',
                 display_order: index + 1
               });
@@ -1003,23 +1013,36 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
 
               // Bridge Plugs (B.P) -> Save into bridge_plugs table in Supabase!
               await sb.from("bridge_plugs").delete().eq("well_id", well.id);
-              const bpToSaveSupabase = (well.bridgePlugs || []).concat(
-                (well.tubings || []).filter((t: any) => isBridgePlugTool(t))
-              );
+              // De-duplicate by id before inserting
+              const bpMapSup = new Map<string, any>();
+              for (const bp of (well.bridgePlugs || [])) {
+                if (bp && bp.id) bpMapSup.set(bp.id, bp);
+              }
+              for (const t of (well.tubings || [])) {
+                if (t && t.id && isBridgePlugTool(t) && !bpMapSup.has(t.id)) {
+                  bpMapSup.set(t.id, t);
+                }
+              }
+              const bpToSaveSupabase = Array.from(bpMapSup.values());
               if (bpToSaveSupabase.length > 0) {
-                const bpToInsert = bpToSaveSupabase.map((bp: any, index: number) => ({
-                  id: bp.id || `bp-${well.id}-${index}-${Date.now()}`,
-                  well_id: well.id,
-                  designation: bp.name || bp.designation || 'Bridge plug',
-                  size: bp.od || bp.size || '7"',
-                  type: bp.customType || bp.type || 'PERMANENT',
-                  length: Number(bp.length) || 0,
-                  bottom_depth: Number(bp.bottomDepth || bp.bottom_depth) || 0,
-                  observations: bp.observations || '',
-                  display_order: index + 1
-                }));
-                const { error: bpErr } = await sb.from("bridge_plugs").insert(bpToInsert);
+                const bpToInsert = bpToSaveSupabase.map((bp: any, index: number) => {
+                  const bpBottomDepth = Number(bp.bottomDepth || bp.bottom_depth) || 0;
+                  console.log(`DEBUG: Saving BP supabase id=${bp.id} bottom_depth=${bpBottomDepth}`);
+                  return {
+                    id: bp.id || `bp-${well.id}-${index}-${Date.now()}`,
+                    well_id: well.id,
+                    designation: bp.name || bp.designation || 'Bridge plug',
+                    size: bp.od || bp.size || '7"',
+                    type: bp.customType || bp.type || 'PERMANENT',
+                    length: Number(bp.length) || 0,
+                    bottom_depth: bpBottomDepth,
+                    observations: bp.observations || '',
+                    display_order: index + 1
+                  };
+                });
+                const { error: bpErr } = await sb.from("bridge_plugs").upsert(bpToInsert, { onConflict: 'id' });
                 if (bpErr) console.warn("bridge_plugs insert warning:", bpErr.message);
+                else console.log(`DEBUG: Saved ${bpToInsert.length} bridge plug(s) to Supabase`);
               }
 
               const snapshotStr = JSON.stringify(snapshotWell);

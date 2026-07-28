@@ -435,7 +435,7 @@ export function runMigrations(): void {
             size TEXT DEFAULT '7"',
             type TEXT DEFAULT 'PERMANENT',
             length REAL DEFAULT 0,
-            bottom_depth REAL NOT NULL,
+            bottom_depth REAL DEFAULT 0,
             observations TEXT,
             display_order INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now')),
@@ -464,7 +464,7 @@ export function runMigrations(): void {
           size TEXT DEFAULT '7"',
           type TEXT DEFAULT 'PERMANENT',
           length REAL DEFAULT 0,
-          bottom_depth REAL NOT NULL,
+          bottom_depth REAL DEFAULT 0,
           observations TEXT,
           display_order INTEGER DEFAULT 0,
           created_at TEXT DEFAULT (datetime('now')),
@@ -483,7 +483,7 @@ export function runMigrations(): void {
           size TEXT DEFAULT '7"',
           type TEXT DEFAULT 'PERMANENT',
           length REAL DEFAULT 0,
-          bottom_depth REAL NOT NULL,
+          bottom_depth REAL DEFAULT 0,
           observations TEXT,
           display_order INTEGER DEFAULT 0,
           created_at TEXT DEFAULT (datetime('now')),
@@ -507,6 +507,50 @@ export function runMigrations(): void {
     try {
       d.prepare(`ALTER TABLE bridge_plugs ADD COLUMN ${col.name} ${col.type}`).run();
     } catch (_) { /* column already exists */ }
+  }
+
+  // Repair migration: if bridge_plugs has bottom_depth with NOT NULL constraint,
+  // rebuild the table to remove it (so 0-depth bridge plugs don't throw errors)
+  try {
+    const bpTableInfo = d.prepare("PRAGMA table_info(bridge_plugs)").all() as any[];
+    const bpDepthCol = bpTableInfo.find((c: any) => c.name === "bottom_depth");
+    if (bpDepthCol && bpDepthCol.notnull === 1) {
+      const colNames2 = bpTableInfo.map((c: any) => c.name);
+      const selectCols = colNames2.map((n: string) => {
+        if (n === "bottom_depth") return "COALESCE(bottom_depth, 0) AS bottom_depth";
+        return n;
+      }).join(", ");
+      d.exec(`
+        CREATE TABLE bridge_plugs_repair (
+          id TEXT PRIMARY KEY,
+          well_id TEXT NOT NULL REFERENCES wells(id) ON DELETE CASCADE,
+          designation TEXT DEFAULT 'Bridge plug',
+          size TEXT DEFAULT '7"',
+          type TEXT DEFAULT 'PERMANENT',
+          length REAL DEFAULT 0,
+          bottom_depth REAL DEFAULT 0,
+          observations TEXT,
+          display_order INTEGER DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+        INSERT INTO bridge_plugs_repair (id, well_id, designation, size, type, length, bottom_depth, observations, display_order)
+        SELECT id, well_id,
+          COALESCE(designation, 'Bridge plug'),
+          COALESCE(size, '7"'),
+          COALESCE(type, 'PERMANENT'),
+          COALESCE(length, 0),
+          COALESCE(bottom_depth, 0),
+          observations,
+          COALESCE(display_order, 0)
+        FROM bridge_plugs;
+        DROP TABLE bridge_plugs;
+        ALTER TABLE bridge_plugs_repair RENAME TO bridge_plugs;
+      `);
+      console.log("bridge_plugs: repaired NOT NULL constraint on bottom_depth");
+    }
+  } catch (repairErr) {
+    console.warn("bridge_plugs repair migration notice:", repairErr);
   }
 }
 
