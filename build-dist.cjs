@@ -7,8 +7,41 @@ function runCommand(cmd, cwd) {
   execSync(cmd, { stdio: 'inherit', cwd: cwd || __dirname });
 }
 
-async function main() {
+async function verifyDatabase() {
+  const dbPath = path.join(__dirname, 'base.db');
+  if (!fs.existsSync(dbPath)) {
+    throw new Error(`❌ base.db not found at ${dbPath}.\nPlease run the dev server first so the database is populated.`);
+  }
+  const size = fs.statSync(dbPath).size;
+  if (size < 1024) {
+    throw new Error(`❌ base.db is too small (${size} bytes) — it appears to be empty or corrupted.\nPlease run the dev server and sync data from Supabase first.`);
+  }
+
+  // Use better-sqlite3 to verify employee count
   try {
+    const Database = require('better-sqlite3');
+    const db = new Database(dbPath, { readonly: true });
+    const row = db.prepare("SELECT COUNT(*) as cnt FROM employees").get();
+    db.close();
+    const empCount = row ? row.cnt : 0;
+    if (empCount === 0) {
+      throw new Error(`❌ base.db has 0 employees. Cannot export — login would fail.\nPlease run the dev server and ensure employees are synced from Supabase first.`);
+    }
+    console.log(`✅ Database verified: ${empCount} employees found in base.db (${Math.round(size/1024)} KB)`);
+  } catch (dbErr) {
+    if (dbErr.message.startsWith('❌')) throw dbErr;
+    console.warn(`⚠️  Could not verify employee count (${dbErr.message}), proceeding anyway...`);
+  }
+}
+
+async function main() {
+
+  try {
+    // 0. Verify database has data before exporting (prevents login failures)
+    console.log('\n=== Verifying database before export ===');
+    await verifyDatabase();
+    console.log('=====================================\n');
+
     // 1. Build the production React frontend and Express server
     runCommand('npm run build');
 
@@ -25,6 +58,13 @@ async function main() {
     fs.cpSync(path.join(__dirname, 'dist'), path.join(stagingDir, 'dist'), { recursive: true });
     fs.copyFileSync(path.join(__dirname, 'electron-main.cjs'), path.join(stagingDir, 'electron-main.cjs'));
     fs.copyFileSync(path.join(__dirname, 'wellborePro.ico'), path.join(stagingDir, 'wellborePro.ico'));
+
+    // Copy seed base.db so the installed app has employee data on first launch
+    const dbSrc = path.join(__dirname, 'base.db');
+    if (fs.existsSync(dbSrc)) {
+      fs.copyFileSync(dbSrc, path.join(stagingDir, 'base.db'));
+      console.log(`  Copied: base.db (${Math.round(fs.statSync(dbSrc).size / 1024)} KB) — seed database bundled`);
+    }
     if (fs.existsSync(path.join(__dirname, '.env.local'))) {
       fs.copyFileSync(path.join(__dirname, '.env.local'), path.join(stagingDir, '.env.local'));
     }
@@ -107,6 +147,7 @@ async function main() {
         'electron-main.cjs',
         'wellborePro.ico',
         '.env.local',
+        'base.db',
         'node_modules/better-sqlite3/build/Release/**/*',
         'node_modules/better-sqlite3/lib/**/*',
         'node_modules/better-sqlite3/package.json',
@@ -114,7 +155,8 @@ async function main() {
         'node_modules/file-uri-to-path/**/*'
       ],
       asarUnpack: [
-        'node_modules/better-sqlite3/build/Release/**/*'
+        'node_modules/better-sqlite3/build/Release/**/*',
+        'base.db'
       ],
       asar: true,
       win: {
