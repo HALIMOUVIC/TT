@@ -51,6 +51,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
 
   const [showReservoirInPerfHeader, setShowReservoirInPerfHeader] = useState(false);
   const [showCementPlugsTable, setShowCementPlugsTable] = useState(true);
+  const [showBridgePlugsTable, setShowBridgePlugsTable] = useState(true);
 
   const handlePrint = () => {
     window.focus();
@@ -661,6 +662,15 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
             <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
               <input
                 type="checkbox"
+                checked={showBridgePlugsTable}
+                onChange={(e) => setShowBridgePlugsTable(e.target.checked)}
+                className="rounded text-orange-600 focus:ring-orange-500 w-3.5 h-3.5"
+              />
+              Barrière de Fond (B.P)
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+              <input
+                type="checkbox"
                 checked={showReservoirInPerfHeader}
                 onChange={(e) => setShowReservoirInPerfHeader(e.target.checked)}
                 className="rounded text-orange-600 focus:ring-orange-500 w-3.5 h-3.5"
@@ -898,7 +908,19 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       </tr>
                     </thead>
                     <tbody>
-                      {tubingsForTable.map((tool, idx) => {
+                      {tubingsForTable
+                        .filter((tool) => {
+                          const effectiveType = (tool.customType || tool.type || '').toLowerCase();
+                          const name = (tool.name || '').toLowerCase();
+                          return (
+                            effectiveType !== 'bridge plug' &&
+                            !effectiveType.includes('bridge') &&
+                            !name.includes('bridge') &&
+                            !name.includes('b.p') &&
+                            !name.includes('bp')
+                          );
+                        })
+                        .map((tool, idx) => {
                         const isBlank = !tool.name;
                         const rowMeta = layout.printTableRows.find((r) => r.toolId === tool.id);
                         const displayOd = rowMeta?.displayOd ?? tool.od;
@@ -964,6 +986,65 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                           ))}
                         </>
                       )}
+
+                      {/* B.P — Barrière de Fond (Bridge Plug) rows */}
+                      {showBridgePlugsTable &&
+                        (well.tubings || []).filter((t) => {
+                          const effectiveType = (t.customType || t.type || '').toLowerCase();
+                          const name = (t.name || '').toLowerCase();
+                          return (
+                            effectiveType === 'bridge plug' ||
+                            effectiveType.includes('bridge') ||
+                            name.includes('bridge') ||
+                            name.includes('b.p') ||
+                            name.includes('bp')
+                          );
+                        }).length > 0 && (
+                          <>
+                            <tr className="border-b border-black border-solid bg-gray-100">
+                              <td colSpan={8} className="px-2 py-0.5 font-sans font-black text-[9px] uppercase tracking-wider text-black">
+                                Barrière de Fond (B.P)
+                              </td>
+                            </tr>
+                            {(well.tubings || [])
+                              .filter((t) => {
+                                const effectiveType = (t.customType || t.type || '').toLowerCase();
+                                const name = (t.name || '').toLowerCase();
+                                return (
+                                  effectiveType === 'bridge plug' ||
+                                  effectiveType.includes('bridge') ||
+                                  name.includes('bridge') ||
+                                  name.includes('b.p') ||
+                                  name.includes('bp')
+                                );
+                              })
+                              .map((bp: TubingComponent, idx: number) => {
+                                const rowMeta = layout.printTableRows.find((r) => r.toolId === bp.id);
+                                const displayOd = rowMeta?.displayOd ?? (bp.od || '7"');
+                                const displayType = rowMeta?.displayType ?? (bp.customType || bp.type || 'PERMANENT');
+                                const qty = rowMeta?.qty ?? (bp.qty || '01');
+
+                                return (
+                                  <tr key={bp.id || `bp-row-${idx}`} className="border-b border-black border-solid text-[10px] h-[22px] text-black">
+                                    <td className="border-r border-black border-solid px-1 font-sans font-bold text-black">{bp.name || 'Bridge plug'}</td>
+                                    <td className="border-r border-black border-solid px-1 text-center text-black font-bold">{qty}</td>
+                                    <td className="border-r border-black border-solid px-1 text-center font-bold text-black">{displayType}</td>
+                                    <td className="border-r border-black border-solid px-1 text-center font-bold text-black">{displayOd}</td>
+                                    <td className="border-r border-black border-solid px-1 text-right font-bold text-black">
+                                      {bp.length ? formatDepth(bp.length) : '0.00'}
+                                    </td>
+                                    <td className="border-r border-black border-solid px-1 text-right font-black text-black">
+                                      {formatDepth(bp.bottomDepth)}
+                                    </td>
+                                    <td className="border-r border-black border-solid px-1 text-center text-black">{bp.minId || '—'}</td>
+                                    <td className="px-1 text-black text-[9.5px] font-medium">
+                                      {bp.observations || ''}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </>
+                        )}
                     </tbody>
                   </table>
                 </div>
