@@ -29,13 +29,16 @@ async function main() {
       fs.copyFileSync(path.join(__dirname, '.env.local'), path.join(stagingDir, '.env.local'));
     }
 
-    // 4. Write staging package.json with unique name to avoid workspace symlink issues
+    const rootPkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
+    const appVersion = rootPkg.version || '1.0.1';
+    console.log(`Building Wellbore Schematic Pro executable version: v${appVersion}...`);
+
     // 4. Write staging package.json with description and author to eliminate warnings
     fs.writeFileSync(
       path.join(stagingDir, 'package.json'),
       JSON.stringify({
         name: 'wellbore-pro-staging',
-        version: '1.0.0',
+        version: appVersion,
         description: 'Wellbore Schematic Pro',
         author: 'ENP',
         main: 'electron-main.cjs',
@@ -124,7 +127,7 @@ async function main() {
         installerIcon: 'wellborePro.ico',
         uninstallerIcon: 'wellborePro.ico',
         uninstallDisplayName: 'Wellbore Schematic Pro',
-        artifactName: 'WellboreSchematicPro Setup.${ext}',
+        artifactName: `WellboreSchematicPro Setup v${appVersion}.\${ext}`,
         runAfterFinish: false
       }
     };
