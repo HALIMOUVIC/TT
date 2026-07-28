@@ -47,11 +47,15 @@ export function formatCasingSize(size: string | number): string {
  * Calculate the maximum depth represented in the wellbore data
  */
 export function calculateMaxDepth(well: WellData): number {
+  const casings = well.casings || [];
+  const tubings = well.tubings || [];
+  const perforations = well.perforations || [];
+
   const depths = [
-    ...well.casings.map((c) => c.drilledDepth),
-    ...well.casings.map((c) => c.shoeDepth),
-    ...well.tubings.map((t) => t.bottomDepth),
-    ...well.perforations.map((p) => p.bottomDepth),
+    ...casings.map((c) => c.drilledDepth),
+    ...casings.map((c) => c.shoeDepth),
+    ...tubings.map((t) => t.bottomDepth),
+    ...perforations.map((p) => p.bottomDepth),
     well.elevationForage,
   ].filter(d => typeof d === "number" && !isNaN(d));
   
@@ -70,7 +74,7 @@ export function calculateKeyAnchors(
   yEnd: number
 ): Array<{ depth: number, y: number }> {
   const depthsSet = new Set<number>([0]);
-  well.casings.forEach((c) => {
+  (well.casings || []).forEach((c) => {
     if (typeof c.shoeDepth === "number" && !isNaN(c.shoeDepth)) depthsSet.add(c.shoeDepth);
     if (typeof c.drilledDepth === "number" && !isNaN(c.drilledDepth)) depthsSet.add(c.drilledDepth);
     if (c.topOfCement !== null && c.topOfCement !== undefined) {
@@ -86,15 +90,19 @@ export function calculateKeyAnchors(
       if (!isNaN(tf)) depthsSet.add(tf);
     }
   });
-  well.tubings.forEach((t) => {
+  (well.tubings || []).forEach((t) => {
     if (typeof t.bottomDepth === "number" && !isNaN(t.bottomDepth)) depthsSet.add(t.bottomDepth);
     if (t.type === "Packer" && typeof t.bottomDepth === "number" && !isNaN(t.bottomDepth)) {
       depthsSet.add(Math.max(0, t.bottomDepth - 10));
     }
   });
-  well.perforations.forEach((p) => {
+  (well.perforations || []).forEach((p) => {
     if (typeof p.topDepth === "number" && !isNaN(p.topDepth)) depthsSet.add(p.topDepth);
     if (typeof p.bottomDepth === "number" && !isNaN(p.bottomDepth)) depthsSet.add(p.bottomDepth);
+  });
+  (well.cementPlugs || []).forEach((cp) => {
+    if (typeof cp.topDepth === "number" && !isNaN(cp.topDepth)) depthsSet.add(cp.topDepth);
+    if (typeof cp.bottomDepth === "number" && !isNaN(cp.bottomDepth)) depthsSet.add(cp.bottomDepth);
   });
 
   const sortedDepths = Array.from(depthsSet)
@@ -113,10 +121,23 @@ export function calculateKeyAnchors(
   const N = sortedDepths.length;
   const maxD = sortedDepths[N - 1] || 100;
 
+  let cumulativeWeight = 0;
+  const weights: number[] = [0];
+  for (let i = 1; i < N; i++) {
+    const span = sortedDepths[i] - sortedDepths[i - 1];
+    // Sub-linear weighting to compress large empty intervals while keeping small intervals compact & proportional
+    const w = Math.pow(Math.max(0, span), 0.55);
+    cumulativeWeight += w;
+    weights.push(cumulativeWeight);
+  }
+
+  const totalWeight = cumulativeWeight || 1;
+
   return sortedDepths.map((depth, i) => {
     const yLinear = yStart + (depth / maxD) * usableHeight;
-    const yEven = yStart + (i / (N - 1)) * usableHeight;
-    const y = 0.6 * yEven + 0.4 * yLinear;
+    const spanRatio = weights[i] / totalWeight;
+    const yCompact = yStart + spanRatio * usableHeight;
+    const y = 0.75 * yCompact + 0.25 * yLinear;
     return { depth, y };
   });
 }
@@ -178,6 +199,8 @@ export function getEffectiveType(type: string | undefined, name: string | undefi
   }
   if (t.includes("mandrel") || t.includes("mandrin") || n.includes("mandrel") || n.includes("mandrin") || n.includes("gas lift")) {
     return "Side-pocket Mandrel";
+  } else if (t.includes("bridge") || n.includes("bridge") || n.includes("b.p") || n.includes("bp")) {
+    return "Bridge Plug";
   } else if (t.includes("packer") || t.includes("pkr") || n.includes("packer") || n.includes("pkr")) {
     return "Packer";
   } else if (t.includes("nipple") || t.includes("siège") || t.includes("siege") || n.includes("nipple") || n.includes("siège") || n.includes("siege") || n.includes("fnp") || n.includes("no-go")) {
@@ -204,14 +227,15 @@ export function getEffectiveType(type: string | undefined, name: string | undefi
 export function getFilteredTubings(tubings: TubingComponent[]): TubingComponent[] {
   let seenJointCourt = false;
   const seenKeys = new Set<string>();
+  const tubingsList = Array.isArray(tubings) ? tubings : [];
 
-  const tubingsWithDepths = [...tubings].map((tool, index) => {
+  const tubingsWithDepths = [...tubingsList].map((tool, index) => {
     if (tool.bottomDepth !== undefined && tool.bottomDepth !== null && tool.bottomDepth > 0) {
       return tool;
     }
     
     if (index > 0) {
-      const prev = tubings[index - 1];
+      const prev = tubingsList[index - 1];
       if (tool.name?.toLowerCase().includes("anchor") && prev.name?.toLowerCase().includes("packer")) {
            return { ...tool, bottomDepth: (prev.bottomDepth || 0) - 0.22 };
       }
@@ -310,7 +334,7 @@ export function calculateComputedTools(
     const rawYTop = mapDepthToYRawFn((tool.bottomDepth || 0) - (tool.length || 0));
     let normalHeight = Math.max(15, rawYBottom - rawYTop);
 
-    if (effectiveType === 'Packer') {
+    if (effectiveType.toLowerCase().includes('packer') || effectiveType.toLowerCase().includes('bridge')) {
       normalHeight = 45;
     } else if (effectiveType === 'Side-pocket Mandrel') {
       normalHeight = 45;
@@ -456,7 +480,8 @@ export function getFrenchType(type: string, name: string): string {
  */
 export function recalculateBottomDepths(tubings: TubingComponent[]): TubingComponent[] {
   let currentDepth = 0;
-  return tubings.map(t => {
+  const list = Array.isArray(tubings) ? tubings : [];
+  return list.map(t => {
     currentDepth += (t.length || 0);
     return {
       ...t,
@@ -470,10 +495,11 @@ export function recalculateBottomDepths(tubings: TubingComponent[]): TubingCompo
  */
 export function calculateCoteProducts(tubings: TubingComponent[], spoolProdStr: string | undefined): Array<TubingComponent & { calculatedCote: number }> {
   const spoolProd = parseFloat(spoolProdStr || '0');
-  const totalLength = tubings.reduce((sum, t) => sum + (t.length || 0), 0);
+  const list = Array.isArray(tubings) ? tubings : [];
+  const totalLength = list.reduce((sum, t) => sum + (t.length || 0), 0);
   let currentCote = totalLength - spoolProd;
 
-  return tubings.map((tool) => {
+  return list.map((tool) => {
     const cote = currentCote;
     currentCote -= tool.length;
     return { ...tool, calculatedCote: cote };
@@ -484,21 +510,23 @@ export function calculateCoteProducts(tubings: TubingComponent[], spoolProdStr: 
  * Calculate height and shot values for a perforation zone
  */
 export function calculatePerforationFields(
-  top: number,
-  bottom: number,
+  topInput: number,
+  bottomInput: number,
   manualHeight?: number,
   density?: number,
   manualShots?: number
-): { height: number; shots?: number } {
+): { topDepth: number; bottomDepth: number; height: number; shots?: number } {
+  const topDepth = Math.min(topInput, bottomInput);
+  const bottomDepth = Math.max(topInput, bottomInput);
   const height = manualHeight !== undefined && manualHeight !== null && manualHeight > 0
     ? parseFloat(manualHeight.toFixed(2))
-    : parseFloat(Math.abs(bottom - top).toFixed(2));
+    : parseFloat((bottomDepth - topDepth).toFixed(2));
 
   const shots = manualShots !== undefined 
     ? manualShots 
     : (density !== undefined ? parseFloat((height * density).toFixed(2)) : undefined);
 
-  return { height, shots };
+  return { topDepth, bottomDepth, height, shots };
 }
 
 /**
@@ -510,12 +538,12 @@ export function savePerforation(
   newPerf: Partial<PerforationZone>,
   editingPerfId: string | null
 ): WellData {
-  const top = newPerf.topDepth || 0;
-  const bottom = newPerf.bottomDepth || 0;
+  const inputTop = newPerf.topDepth ?? 0;
+  const inputBottom = newPerf.bottomDepth ?? 0;
   
-  const { height, shots } = calculatePerforationFields(
-    top,
-    bottom,
+  const { topDepth, bottomDepth, height, shots } = calculatePerforationFields(
+    inputTop,
+    inputBottom,
     newPerf.height,
     newPerf.density,
     newPerf.shots
@@ -526,12 +554,12 @@ export function savePerforation(
   let updatedPerforations: PerforationZone[];
 
   if (editingPerfId) {
-    updatedPerforations = well.perforations.map(p => {
+    updatedPerforations = (well.perforations || []).map(p => {
       if (p.id === editingPerfId) {
         return {
           ...p,
-          topDepth: top,
-          bottomDepth: bottom,
+          topDepth: topDepth,
+          bottomDepth: bottomDepth,
           height: height,
           perfoType: newPerf.perfoType || '',
           diameter: newPerf.diameter || '',
@@ -547,8 +575,8 @@ export function savePerforation(
   } else {
     const entry: PerforationZone = {
       id: `perf-${Date.now()}`,
-      topDepth: top,
-      bottomDepth: bottom,
+      topDepth: topDepth,
+      bottomDepth: bottomDepth,
       height: height,
       perfoType: newPerf.perfoType || '',
       diameter: newPerf.diameter || '',
@@ -558,7 +586,7 @@ export function savePerforation(
       observations: newPerf.observations || '',
       reservoir: newPerf.reservoir || ''
     };
-    updatedPerforations = [...well.perforations, entry];
+    updatedPerforations = [...(well.perforations || []), entry];
   }
 
   return {
@@ -575,7 +603,7 @@ export function savePerforation(
 export function removePerforationFromWell(well: WellData, id: string): WellData {
   return {
     ...well,
-    perforations: well.perforations.filter(p => p.id !== id),
+    perforations: (well.perforations || []).filter(p => p.id !== id),
     updatedAt: new Date().toISOString()
   };
 }
@@ -662,6 +690,7 @@ export function imageSlugForType(typeName: string, designation?: string): string
   if (t.includes('shoe') || t.includes('sabot') || d.includes('sabot')) return 'sabot';
   if (t.includes('mandrel') || t.includes('mandrin') || d.includes('mandrin')) return 'mandrin';
   if (t.includes('packer') || d.includes('packer')) return 'packer';
+  if (t.includes('bridge') || d.includes('bridge')) return 'bridge-plug';
   if (t.includes('drill') || d.includes('drill')) return 'drill';
   if (t.includes('sliding')) return 'sliding-sleeve';
   if (t.includes('fonde') || t.includes('tf') || t.includes('liner') || d.includes('fonde') || d.includes('tf') || d.includes('liner')) return 'liner';
@@ -671,7 +700,7 @@ export function imageSlugForType(typeName: string, designation?: string): string
 export function toolSvgUrl(typeOrDesignation: string): string {
   const slug = String(typeOrDesignation || '').trim().toLowerCase();
   if (!slug) return '';
-  return `/img/${slug}.svg`;
+  return `/img/${slug}.svg?v=2`;
 }
 
 function inferRenderType(typeName: string): 'image' | 'vector' {
@@ -694,13 +723,16 @@ function inferVectorType(typeName: string): TubingComponentConfig['vectorType'] 
   return 'default';
 }
 
-function inferViewBox(_typeName: string): string {
+function inferViewBox(typeName: string): string {
+  const t = typeName.toLowerCase();
+  if (t.includes('bridge')) return '0 0 512 512';
+  if (t.includes('packer')) return '0 0 300 750';
   return '0 0 300 220';
 }
 
 function inferMinHeight(typeName: string, renderType: 'image' | 'vector'): number {
   const t = typeName.toLowerCase();
-  if (t.includes('packer') || t.includes('mandrel')) return 35;
+  if (t.includes('packer') || t.includes('mandrel') || t.includes('bridge')) return 45;
   if (t.includes('sliding')) return 30;
   if (t.includes('nipple') || t.includes('shoe') || t.includes('drill') || t.includes('anchor')) return 25;
   if (t.includes('reduction')) return 20;

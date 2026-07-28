@@ -4,6 +4,7 @@ import {
   CasingString,
   TubingComponent,
   PerforationZone,
+  CementPlug,
 } from "../types";
 import {
   parseSizeToNumber,
@@ -466,11 +467,25 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
             updatedAt: new Date().toISOString()
           };
 
+          let editedBy = "";
+          try {
+            const savedUser = localStorage.getItem("currentUser");
+            if (savedUser) {
+              const parsed = JSON.parse(savedUser);
+              if (parsed) {
+                editedBy = parsed.nom_prenom || parsed.matricule || "";
+              }
+            }
+          } catch (e) {
+            console.warn("Could not load current user from localStorage for save:", e);
+          }
+
           const response = await fetch("/api/supabase/push-wells", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              wells: [wellToSave]
+              wells: [wellToSave],
+              editedBy
             })
           });
 
@@ -567,6 +582,22 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
     return minY;
   }, null as number | null);
 
+  const primaryShoeY: number | null = useMemo(() => {
+    const shoeTools = computedTools.filter(
+      (t) =>
+        t.effectiveType.toLowerCase().includes('shoe') ||
+        t.effectiveType.toLowerCase().includes('sabot') ||
+        (t.name || '').toLowerCase().includes('shoe') ||
+        (t.name || '').toLowerCase().includes('sabot')
+    );
+    if (shoeTools.length === 0) return null;
+    return shoeTools.reduce((min, t) => (t.visualYBottom < min ? t.visualYBottom : min), shoeTools[0].visualYBottom);
+  }, [computedTools]);
+
+  const maxTubingY: number | null = globalYTF !== null
+    ? (primaryShoeY !== null ? Math.min(globalYTF, primaryShoeY) : globalYTF)
+    : primaryShoeY;
+
   const rightLabelYByToolId = useMemo(() => {
     const map = new Map<string, number>();
     for (const lbl of layout?.rightLabels || []) {
@@ -579,6 +610,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
     const isTubingLike = (t: string) => t === 'Tubing' || t === 'Tubing Court';
     const completion = computedTools
       .filter((t) => !isTubingLike(t.effectiveType))
+      .filter((t) => primaryShoeY === null || (t.visualYTop ?? 0) <= primaryShoeY)
       .sort((a, b) => (a.bottomDepth || 0) - (b.bottomDepth || 0));
     const ranges: { yStart: number; yEnd: number }[] = [];
     let groupStart = 0;
@@ -589,16 +621,18 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
       if (breakCluster) {
         const group = completion.slice(groupStart, i);
         if (group.length > 0) {
-          ranges.push({
-            yStart: Math.min(...group.map((t) => t.visualYTop ?? 0)),
-            yEnd: Math.max(...group.map((t) => t.visualYBottom ?? 0)),
-          });
+          const yStart = Math.min(...group.map((t) => t.visualYTop ?? 0));
+          const rawYEnd = Math.max(...group.map((t) => t.visualYBottom ?? 0));
+          const yEnd = primaryShoeY !== null ? Math.min(rawYEnd, primaryShoeY) : rawYEnd;
+          if (yStart < yEnd) {
+            ranges.push({ yStart, yEnd });
+          }
         }
         groupStart = i;
       }
     }
     return ranges;
-  }, [computedTools]);
+  }, [computedTools, primaryShoeY]);
 
   const renderTubingColumn = (yStart: number, yEnd: number, key: string) => {
     const segHeight = yEnd - yStart;
@@ -632,7 +666,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
   };
 
   const casingsToDraw = (layout?.casings || []).map((cd, drawIndex) => {
-    const casing = well.casings[cd.casingIndex];
+    const casing = (well.casings || [])[cd.casingIndex];
     return {
       casing,
       index: drawIndex,
@@ -1001,7 +1035,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
 
           {/* Draw Casings & Cement (Outer elements first) */}
           {!well.isCasingsCleared &&
-            well.casings.length > 0 && (
+            (well.casings || []).length > 0 && (
               <g key="casings-group-interactive">
                 {casingsToDraw.map((cd) => {
                     const {
@@ -1340,60 +1374,133 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
               </g>
             )}
 
-          {/* PERFORATIONS (Drawn crossing the production casing) */}
-          {well.perforations && well.perforations.length > 0 && well.perforations.map((perf, pIdx) => {
-            const yTop = mapDepthToY(perf.topDepth || 0);
-            const yBottom = mapDepthToY(perf.bottomDepth || 0);
-            const height = Math.max(0, yBottom - yTop);
-
-            // Get the active casing radius at the perforation depth so arrows start at the casing wall
-            const perfMidDepth = ((perf.topDepth || 0) + (perf.bottomDepth || 0)) / 2;
-            const perfCasingR = activeCasingRadius(well, layout?.casings || [], perfMidDepth);
-            // Arrow tip extends ~22px past the casing wall outward
-            const arrowOuter = perfCasingR + 22;
-            // Arrowhead tip is 5px further out
-            const arrowTip = arrowOuter + 5;
-
-            const resValue = perf.reservoir || well.reservoir;
-            const textRes = resValue ? ` ${resValue}` : '';
+          {/* CEMENT PLUGS (B.C — Bouchon de Ciment) */}
+          {(well.cementPlugs || []).map((cp: CementPlug, cpIdx: number) => {
+            const yTop = mapDepthToY(cp.topDepth);
+            const yBot = mapDepthToY(cp.bottomDepth);
+            const plugHeight = Math.max(0, yBot - yTop);
+            if (plugHeight <= 0) return null;
+            const plugMidDepth = (cp.topDepth + cp.bottomDepth) / 2;
+            const plugCasingR = activeCasingRadius(well, layout?.casings || [], plugMidDepth);
+            const labelLineX = xCenter + plugCasingR + 4;
+            const labelTextX = labelLineX + 20;
 
             return (
               <g
-                key={perf.id || `perf-${pIdx}`}
-                className="cursor-pointer group hover:opacity-80 transition-opacity"
+                key={cp.id || `bc-${cpIdx}`}
+                className="cursor-pointer group"
                 onMouseEnter={() =>
                   setHoveredItem({
-                    name: `Zone Perforée${textRes}${
-                      perf.perfoType || perf.density
-                        ? ` (${[perf.perfoType, perf.density ? `${perf.density} spf` : ''].filter(Boolean).join(' / ')})`
-                        : ''
-                    }`,
-                    depth: `${perf.topDepth}m - ${perf.bottomDepth}m`,
-                    type: "Reservoir Perforations",
+                    name: `B.C — Bouchon de Ciment`,
+                    depth: `Top ciment: ${cp.topDepth}m — B.C: ${cp.bottomDepth}m`,
+                    type: 'Cement Plug',
                   })
                 }
                 onMouseLeave={() => setHoveredItem(null)}
               >
-                {/* Perforation zone highlight — only spans casing width + arrow reach */}
+                {/* Cement plug fill */}
                 <rect
-                  x={xCenter - arrowOuter}
+                  x={xCenter - plugCasingR}
                   y={yTop}
-                  width={arrowOuter * 2}
-                  height={height || 4}
-                  fill="#fecdd3"
-                  opacity="0.25"
-                  className="transition-opacity group-hover:opacity-45"
+                  width={plugCasingR * 2}
+                  height={plugHeight}
+                  fill="url(#cement-pattern)"
+                  stroke="#94a3b8"
+                  strokeWidth="0.75"
+                  opacity="0.92"
+                  className="transition-opacity group-hover:opacity-70"
                 />
 
-                {/* Perforation conic jets — positions recomputed from yTop/yBottom to always match the highlight zone */}
-                {(() => {
-                  const numConics = height > 0 ? Math.max(2, Math.round(height / 12)) : 1;
-                  const step = height > 0 ? height / numConics : 0;
-                  const perfRows: number[] = [];
-                  for (let k = 0; k < numConics; k++) {
-                    perfRows.push(yTop + step * k + step / 2); // center each conic in its interval
+                {/* Top ciment label — placed ABOVE the line to avoid overlap */}
+                <line x1={labelLineX} y1={yTop} x2={labelLineX + 16} y2={yTop} stroke="#475569" strokeWidth="1.2" />
+                <rect x={labelTextX - 2} y={yTop - 16} width={120} height={14} fill="white" opacity="0.85" rx="2" />
+                <text
+                  x={labelTextX}
+                  y={yTop - 5}
+                  fontSize="11"
+                  fill="#1e293b"
+                  fontFamily="monospace"
+                  fontWeight="700"
+                >
+                  Top ciment à {cp.topDepth}m
+                </text>
+
+                {/* B.C bottom label — placed BELOW the bottom line */}
+                <line x1={labelLineX} y1={yBot} x2={labelLineX + 16} y2={yBot} stroke="#475569" strokeWidth="1.2" />
+                <rect x={labelTextX - 2} y={yBot + 3} width={100} height={14} fill="white" opacity="0.85" rx="2" />
+                <text
+                  x={labelTextX}
+                  y={yBot + 13}
+                  fontSize="11"
+                  fill="#1e293b"
+                  fontFamily="monospace"
+                  fontWeight="700"
+                >
+                  B.C à {cp.bottomDepth}m
+                </text>
+              </g>
+            );
+          })}
+
+          {/* PERFORATIONS (Grouped by Reservoir) */}
+          {well.perforations && well.perforations.length > 0 && (() => {
+            const groupsMap = new Map<string, typeof well.perforations>();
+            well.perforations.forEach(p => {
+              const res = p.reservoir || well.reservoir || '';
+              if (!groupsMap.has(res)) {
+                groupsMap.set(res, []);
+              }
+              groupsMap.get(res)!.push(p);
+            });
+
+            return Array.from(groupsMap.entries()).map(([resName, groupPerfs], gIdx) => {
+              const topD = Math.min(...groupPerfs.map(p => Math.min(p.topDepth || 0, p.bottomDepth || 0)));
+              const bottomD = Math.max(...groupPerfs.map(p => Math.max(p.topDepth || 0, p.bottomDepth || 0)));
+              const yTop = mapDepthToY(topD);
+              const yBottom = mapDepthToY(bottomD);
+              const height = Math.max(0, yBottom - yTop);
+              const span = bottomD - topD;
+
+              const perfMidDepth = (topD + bottomD) / 2;
+              const perfCasingR = activeCasingRadius(well, layout?.casings || [], perfMidDepth);
+              const arrowOuter = perfCasingR + 22;
+              const arrowTip = arrowOuter + 5;
+
+              const textRes = resName ? ` ${resName}` : '';
+
+              const shotsCount = 3;
+              const perfRows: number[] = [];
+              for (let k = 0; k < shotsCount; k++) {
+                const depth = topD + (span * (k + 0.5)) / shotsCount;
+                perfRows.push(mapDepthToY(depth));
+              }
+
+              return (
+                <g
+                  key={`perf-group-${gIdx}`}
+                  className="cursor-pointer group hover:opacity-80 transition-opacity"
+                  onMouseEnter={() =>
+                    setHoveredItem({
+                      name: `Zone Perforée${textRes}`,
+                      depth: `${topD}m - ${bottomD}m`,
+                      type: "Reservoir Perforations",
+                    })
                   }
-                  return perfRows.map((yVal, i) => (
+                  onMouseLeave={() => setHoveredItem(null)}
+                >
+                  {/* Perforation zone highlight — only spans casing width + arrow reach */}
+                  <rect
+                    x={xCenter - arrowOuter}
+                    y={yTop}
+                    width={arrowOuter * 2}
+                    height={height || 4}
+                    fill="#fecdd3"
+                    opacity="0.25"
+                    className="transition-opacity group-hover:opacity-45"
+                  />
+
+                  {/* Perforation conic jets distributed precisely across this zone's meter depth */}
+                  {perfRows.map((yVal, i) => (
                     <g key={i}>
                       {/* Left conic — base on casing wall, tip pointing left */}
                       <polygon
@@ -1412,33 +1519,33 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                         strokeLinejoin="round"
                       />
                     </g>
-                  ));
-                })()}
+                  ))}
 
-                {/* Annotation bracket: from arrow tip to label */}
-                <line x1={xCenter + arrowTip + 3} y1={yTop}    x2={xCenter + arrowTip + 28} y2={yTop}    stroke="#c41230" strokeWidth="1.2" />
-                <line x1={xCenter + arrowTip + 3} y1={yBottom} x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1.2" />
-                <line x1={xCenter + arrowTip + 28} y1={yTop}   x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1" />
-                <text x={xCenter + arrowTip + 33} y={(yTop + yBottom) / 2 - 2} fontSize="10" fill="#be123c" fontWeight="bold">
-                  PRF:
-                </text>
-                <text x={xCenter + arrowTip + 33} y={(yTop + yBottom) / 2 + 10} fontSize="10" fill="#be123c" fontWeight="bold">
-                  {perf.topDepth} - {perf.bottomDepth}m{textRes}
-                </text>
-              </g>
-            );
-          })}
+                  {/* Annotation bracket: from arrow tip to label */}
+                  <line x1={xCenter + arrowTip + 3} y1={yTop}    x2={xCenter + arrowTip + 28} y2={yTop}    stroke="#c41230" strokeWidth="1.2" />
+                  <line x1={xCenter + arrowTip + 3} y1={yBottom} x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1.2" />
+                  <line x1={xCenter + arrowTip + 28} y1={yTop}   x2={xCenter + arrowTip + 28} y2={yBottom} stroke="#c41230" strokeWidth="1" />
+                  <text x={xCenter + arrowTip + 33} y={(yTop + yBottom) / 2 - 2} fontSize="10" fill="#be123c" fontWeight="bold">
+                    PRF:
+                  </text>
+                  <text x={xCenter + arrowTip + 33} y={(yTop + yBottom) / 2 + 10} fontSize="10" fill="#be123c" fontWeight="bold">
+                    {topD} - {bottomD}m{textRes}
+                  </text>
+                </g>
+              );
+            });
+          })()}
 
           {/* INNER TUBING STRING (Double central line) */}
-          {well.tubings.some(tool => tool.name) && (
+          {(well.tubings || []).some(tool => tool.name) && (
               <g
                 className="cursor-pointer group hover:opacity-80 transition-opacity"
                 onMouseEnter={() => {
-                  const mainTubings = well.tubings.filter(t => t.type === "Tubing" || !t.type);
+                  const mainTubings = (well.tubings || []).filter(t => t.type === "Tubing" || !t.type);
                   const firstTubing = mainTubings[0];
                   setHoveredItem({
                     name: `Production Tubing String`,
-                    depth: `0m - ${(well.tubings.filter(t => t.name).length > 0 ? Math.max(...well.tubings.filter(t => t.name).map((t) => typeof t.bottomDepth === "string" ? parseFloat(t.bottomDepth || "0") : (t.bottomDepth || 0)).filter(v => !isNaN(v))) : 0)}m`,
+                    depth: `0m - ${((well.tubings || []).filter(t => t.name).length > 0 ? Math.max(...(well.tubings || []).filter(t => t.name).map((t) => typeof t.bottomDepth === "string" ? parseFloat(t.bottomDepth || "0") : (t.bottomDepth || 0)).filter(v => !isNaN(v))) : 0)}m`,
                     type: `tubing`,
                     od: firstTubing?.od || "2''7/8",
                     length: firstTubing?.length,
@@ -1449,7 +1556,8 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                 onMouseLeave={() => setHoveredItem(null)}
               >
                 {(layout?.tubingSegments || []).map((seg, sIdx) => {
-                  const effectiveYEnd = globalYTF !== null ? Math.min(seg.yEnd, globalYTF) : seg.yEnd;
+                  if (maxTubingY !== null && seg.yStart >= maxTubingY) return null;
+                  const effectiveYEnd = maxTubingY !== null ? Math.min(seg.yEnd, maxTubingY) : seg.yEnd;
                   const segHeight = effectiveYEnd - seg.yStart;
                   if (segHeight <= 0) return null;
                   return (
@@ -1497,7 +1605,8 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
           )}
 
           {completionBackbones.map((range, idx) => {
-            const effectiveYEnd = globalYTF !== null ? Math.min(range.yEnd, globalYTF) : range.yEnd;
+            if (maxTubingY !== null && range.yStart >= maxTubingY) return null;
+            const effectiveYEnd = maxTubingY !== null ? Math.min(range.yEnd, maxTubingY) : range.yEnd;
             const height = effectiveYEnd - range.yStart;
             if (height <= 0) return null;
             return renderTubingColumn(range.yStart, effectiveYEnd, `completion-backbone-${idx}`);
@@ -1543,12 +1652,48 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
               >
                 {/* 1. RENDER GRAPHICS */}
                 {(() => {
+                  const isBridgePlug =
+                    effectiveType === 'Bridge Plug' ||
+                    effectiveType.toLowerCase().includes('bridge') ||
+                    effectiveType.toLowerCase().includes('bouchon') ||
+                    (tool.name || '').toLowerCase().includes('bridge') ||
+                    (tool.name || '').toLowerCase().includes('bouchon') ||
+                    (tool.type || '').toLowerCase().includes('bridge') ||
+                    (tool.type || '').toLowerCase().includes('bouchon');
+
+                    if (isBridgePlug) {
+                      const casingInnerWidth = activeCsgR * 2 + 2.5;
+                      const svgWidth = casingInnerWidth * (512 / 119.13);
+                      const svgX = xCenter - (253.68 / 512) * svgWidth;
+                      const plugDrawHeight = Math.max(50, height);
+                      return (
+                        <svg
+                          x={svgX}
+                          y={yTop}
+                          width={svgWidth}
+                          height={plugDrawHeight}
+                          viewBox="0 0 512 512"
+                          preserveAspectRatio="none"
+                        >
+                          <image
+                            href="/img/bridge-plug.svg?v=10"
+                            x="0"
+                            y="0"
+                            width="512"
+                            height="512"
+                            preserveAspectRatio="none"
+                          />
+                        </svg>
+                      );
+                    }
+
                   if (config.renderType === 'image') {
                     const drawHeight = Math.max(config.minHeight || 15, height);
                     const scale = config.mainScale || 0.25;
                     const { width: vbW, height: vbH } = parseViewBoxSize(config.viewBox);
                     const imgWidth = vbW * scale;
                     const imgX = xCenter - (vbW * 0.4) * scale;
+
                     return (
                       <svg
                         x={imgX}
@@ -1730,7 +1875,13 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                     (tool.type || '').toLowerCase().includes('shoe') ||
                     (tool.type || '').toLowerCase().includes('sabot');
                   
-                  if (isPacker) {
+                  const isBridgePlug =
+                    effectiveType === 'Bridge Plug' ||
+                    effectiveType.toLowerCase().includes('bridge') ||
+                    (tool.name || '').toLowerCase().includes('bridge') ||
+                    (tool.type || '').toLowerCase().includes('bridge');
+
+                  if (isPacker || isBridgePlug) {
                     anchorY = yTop + (277 / 635) * Math.max(35, height);
                     textY = anchorY;
                     linePoints = `${xCenter + activeCsgR},${anchorY} ${xCenter + activeCsgR + 10},${anchorY} ${xCenter + activeCsgR + 25},${anchorY} ${xCenter + activeCsgR + 55},${anchorY}`;
@@ -1757,7 +1908,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                   const resolvedTextY = rightLabelYByToolId.get(`tool-${tool.id}`);
                   if (resolvedTextY !== undefined) {
                     textY = resolvedTextY;
-                    if (isPacker) {
+                    if (isPacker || isBridgePlug) {
                       linePoints = `${xCenter + activeCsgR},${anchorY} ${xCenter + activeCsgR + 10},${anchorY} ${xCenter + activeCsgR + 25},${textY} ${xCenter + activeCsgR + 55},${textY}`;
                     } else if (isMandrin) {
                       linePoints = `${xCenter + 28},${anchorY} ${xCenter + 35},${anchorY} ${xCenter + 45},${textY} ${xCenter + 75},${textY}`;
@@ -1784,7 +1935,7 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                         strokeWidth="1"
                       />
                       <text
-                        x={xCenter + (isPacker ? activeCsgR + 60 : 80)}
+                        x={xCenter + ((isPacker || isBridgePlug) ? activeCsgR + 60 : 80)}
                         y={textY}
                         fontSize="10"
                         fill="#0f172a"
@@ -1793,13 +1944,13 @@ export default function WellboreSchematic({ well, onChange }: WellboreSchematicP
                       >
                         {isMandrin ? (
                           <>
-                            <tspan x={xCenter + (isPacker ? activeCsgR + 60 : 80)} dy="-0.5em">{`${labelPrefix} ${tool.customType || tool.type}`}</tspan>
-                            <tspan x={xCenter + (isPacker ? activeCsgR + 60 : 80)} dy="1.5em">{`${tool.bottomDepth} m`}</tspan>
+                            <tspan x={xCenter + ((isPacker || isBridgePlug) ? activeCsgR + 60 : 80)} dy="-0.5em">{`${labelPrefix} ${tool.customType || tool.type}`}</tspan>
+                            <tspan x={xCenter + ((isPacker || isBridgePlug) ? activeCsgR + 60 : 80)} dy="1.5em">{`${tool.bottomDepth} m`}</tspan>
                           </>
                         ) : (
                           <>
-                            <tspan x={xCenter + (isPacker ? activeCsgR + 60 : 80)} dy="-0.5em">{labelText1}</tspan>
-                            <tspan x={xCenter + (isPacker ? activeCsgR + 60 : 80)} dy="1.5em">{labelText2}</tspan>
+                            <tspan x={xCenter + ((isPacker || isBridgePlug) ? activeCsgR + 60 : 80)} dy="-0.5em">{labelText1}</tspan>
+                            <tspan x={xCenter + ((isPacker || isBridgePlug) ? activeCsgR + 60 : 80)} dy="1.5em">{labelText2}</tspan>
                           </>
                         )}
                       </text>

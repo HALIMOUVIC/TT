@@ -52,6 +52,13 @@ export interface TubingComponent {
   minId?: string; // French "Ø Mini"
 }
 
+export interface CementPlug {
+  id: string;
+  topDepth: number;    // Top ciment (du)
+  bottomDepth: number; // Bottom (B.C) (à)
+  observations?: string;
+}
+
 export interface PerforationZone {
   id: string;
   topDepth: number; // in meters
@@ -106,6 +113,7 @@ export interface WellData {
   casings: CasingString[];
   tubings: TubingComponent[];
   perforations: PerforationZone[];
+  cementPlugs?: CementPlug[];
   isAbandonProvisoire?: boolean;
   isCasingsCleared?: boolean;
   observations?: string;
@@ -119,6 +127,7 @@ export interface WellData {
   updatedDate?: string;
   endOperationDate?: string;
   vuBy?: string;
+  editedBy?: string;
   createdAt: string;
   updatedAt: string;
 }

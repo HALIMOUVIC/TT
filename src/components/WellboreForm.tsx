@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { WellData, CasingString, TubingComponent, TubingComponentType } from '../types';
+import { WellData, CasingString, TubingComponent, TubingComponentType, CementPlug } from '../types';
 import { parseSizeToNumber, calculateCoteProducts, recalculateBottomDepths, getTubingTypeDefaults } from '../lib/wellboreEngine';
 import { Layers, Plus, Trash2, ArrowUp, ArrowDown, RefreshCw, Check, Edit, Disc, AlignJustify, GripVertical } from 'lucide-react';
 import {
@@ -156,16 +156,18 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
     if (!over) return;
     if (active.id !== over.id) {
       if (String(active.id).startsWith('casing-')) {
-        const oldIndex = well.casings.findIndex(c => c.id === active.id);
-        const newIndex = well.casings.findIndex(c => c.id === over.id);
+        const casings = well.casings || [];
+        const oldIndex = casings.findIndex(c => c.id === active.id);
+        const newIndex = casings.findIndex(c => c.id === over.id);
         if (oldIndex !== -1 && newIndex !== -1) {
-          onChange({ ...well, casings: arrayMove(well.casings, oldIndex, newIndex), updatedAt: new Date().toISOString() });
+          onChange({ ...well, casings: arrayMove(casings, oldIndex, newIndex), updatedAt: new Date().toISOString() });
         }
       } else {
-        const oldIndex = well.tubings.findIndex(t => t.id === active.id);
-        const newIndex = well.tubings.findIndex(t => t.id === over.id);
+        const tubings = well.tubings || [];
+        const oldIndex = tubings.findIndex(t => t.id === active.id);
+        const newIndex = tubings.findIndex(t => t.id === over.id);
         if (oldIndex !== -1 && newIndex !== -1) {
-          onChange({ ...well, tubings: arrayMove(well.tubings, oldIndex, newIndex), updatedAt: new Date().toISOString() });
+          onChange({ ...well, tubings: arrayMove(tubings, oldIndex, newIndex), updatedAt: new Date().toISOString() });
         }
       }
     }
@@ -173,7 +175,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
 
   const handleMoveCasingUp = (index: number) => {
     if (index <= 0) return;
-    const list = [...well.casings];
+    const list = [...(well.casings || [])];
     const temp = list[index];
     list[index] = list[index - 1];
     list[index - 1] = temp;
@@ -185,8 +187,8 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
   };
 
   const handleMoveCasingDown = (index: number) => {
-    if (index >= well.casings.length - 1) return;
-    const list = [...well.casings];
+    const list = [...(well.casings || [])];
+    if (index >= list.length - 1) return;
     const temp = list[index];
     list[index] = list[index + 1];
     list[index + 1] = temp;
@@ -263,9 +265,9 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
   };
 
   const handleSaveCasing = () => {
-    let updatedCasingsList = [...well.casings];
+    let updatedCasingsList = [...(well.casings || [])];
     if (editingCasingId) {
-      updatedCasingsList = well.casings.map(c => {
+      updatedCasingsList = (well.casings || []).map(c => {
         if (c.id === editingCasingId) {
           return {
             ...c,
@@ -310,7 +312,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
   };
 
   const handleSaveTubing = () => {
-    let updatedTubingsList = [...well.tubings];
+    let updatedTubingsList = [...(well.tubings || [])];
     const hasTubingData = newTubing.name && newTubing.length > 0;
 
     if (hasTubingData) {
@@ -318,7 +320,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
       const bottomDepth = newTubing.bottomDepth;
 
       if (editingTubingId) {
-        updatedTubingsList = well.tubings.map(t => {
+        updatedTubingsList = (well.tubings || []).map(t => {
           if (t.id === editingTubingId) {
             return {
               ...t,
@@ -375,20 +377,55 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
     }
   };
 
+  // ==================== CEMENT PLUG (B.C) ====================
+  const [newCementPlug, setNewCementPlug] = useState<Partial<CementPlug>>({
+    topDepth: undefined,
+    bottomDepth: undefined,
+    observations: ''
+  });
+  const [showBCForm, setShowBCForm] = useState(false);
+
+  const handleSaveCementPlug = () => {
+    const top = newCementPlug.topDepth;
+    const bot = newCementPlug.bottomDepth;
+    if (top === undefined || bot === undefined || isNaN(top) || isNaN(bot) || bot <= top) return;
+    const entry: CementPlug = {
+      id: `bc-${Date.now()}`,
+      topDepth: top,
+      bottomDepth: bot,
+      observations: newCementPlug.observations || ''
+    };
+    onChange({
+      ...well,
+      cementPlugs: [...(well.cementPlugs || []), entry],
+      updatedAt: new Date().toISOString()
+    });
+    setNewCementPlug({ topDepth: undefined, bottomDepth: undefined, observations: '' });
+  };
+
+  const removeCementPlug = (id: string) => {
+    onChange({
+      ...well,
+      cementPlugs: (well.cementPlugs || []).filter(cp => cp.id !== id),
+      updatedAt: new Date().toISOString()
+    });
+  };
+
   // ==================== SEPARATE ACTIONS (DELETE/MOVE) ====================
   const removeTubing = (id: string) => {
     onChange({
       ...well,
-      tubings: well.tubings.filter(t => t.id !== id),
+      tubings: (well.tubings || []).filter(t => t.id !== id),
       updatedAt: new Date().toISOString()
     });
   };
 
   const moveTubing = (index: number, direction: 'up' | 'down') => {
+    const tubings = well.tubings || [];
     if (direction === 'up' && index === 0) return;
-    if (direction === 'down' && index === well.tubings.length - 1) return;
+    if (direction === 'down' && index === tubings.length - 1) return;
 
-    const newTubings = [...well.tubings];
+    const newTubings = [...tubings];
     const targetIdx = direction === 'up' ? index - 1 : index + 1;
     
     const temp = newTubings[index];
@@ -417,10 +454,16 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
         const response = await fetch("/api/supabase/custom-tool-types");
         const json = await response.json();
         if (json.success && json.data && json.data.length > 0) {
-          setComponentTypes(json.data.map((item: any) => ({
+          const fetchedTypes = json.data.map((item: any) => ({
             value: item.type,
             label: item.french_designation || item.type
-          })));
+          }));
+          const hasTubing = fetchedTypes.some((t: any) => t.value === 'Tubing');
+          if (!hasTubing) {
+            setComponentTypes([{ value: 'Tubing', label: 'Tubing' }, ...fetchedTypes]);
+          } else {
+            setComponentTypes(fetchedTypes);
+          }
         }
       } catch (error) {
         console.error("Failed to fetch component types:", error);
@@ -640,7 +683,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 onChange={(e) => handleTubingTypeChange(e.target.value as TubingComponentType)}
               >
                 {componentTypes.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.value}</option>
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
               <input
@@ -743,8 +786,22 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
           </div>
         </div>
 
-        {/* ONE SAVE BUTTON */}
-        <div className="flex justify-end pt-2">
+        {/* ONE SAVE BUTTON + ADD B.C BUTTON */}
+        <div className="flex justify-end gap-2 pt-2">
+          {canAddOrEdit && (
+            <button
+              type="button"
+              onClick={() => setShowBCForm(v => !v)}
+              className={`h-9 px-4 font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-sm flex items-center gap-2 border ${
+                showBCForm
+                  ? 'bg-slate-200 text-slate-700 border-slate-300'
+                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              <span className="text-[10px] font-bold bg-slate-600 text-white rounded px-1 py-0.5">BC</span>
+              Add B.C
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSaveTubing}
@@ -754,11 +811,83 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
             {editingTubingId ? 'Save Changes' : 'Add Component'}
           </button>
         </div>
+
+        {/* B.C — BOUCHON DE CIMENT (hidden until Add B.C clicked) */}
+        {showBCForm && (
+          <div className="border-t border-slate-200 pt-4 space-y-3">
+            <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bouchon de Ciment (B.C)</h5>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Top Ciment — du (m)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="ex: 296.89"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono"
+                  value={newCementPlug.topDepth ?? ''}
+                  onChange={e => setNewCementPlug(prev => ({ ...prev, topDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">B.C — à (m)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="ex: 703"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono"
+                  value={newCementPlug.bottomDepth ?? ''}
+                  onChange={e => setNewCementPlug(prev => ({ ...prev, bottomDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Observations</label>
+                <input
+                  type="text"
+                  placeholder="Notes..."
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white"
+                  value={newCementPlug.observations || ''}
+                  onChange={e => setNewCementPlug(prev => ({ ...prev, observations: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => { handleSaveCementPlug(); setShowBCForm(false); }}
+                className="h-9 px-6 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Check className="w-4 h-4" />
+                Save B.C
+              </button>
+            </div>
+
+            {/* Existing cement plugs list */}
+            {(well.cementPlugs || []).length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bouchons enregistrés</p>
+                {(well.cementPlugs || []).map(cp => (
+                  <div key={cp.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                    <span className="text-xs font-mono text-slate-700">
+                      Top ciment à <strong>{cp.topDepth}m</strong> — B.C à <strong>{cp.bottomDepth}m</strong>
+                      {cp.observations ? <span className="text-slate-500 ml-2">({cp.observations})</span> : null}
+                    </span>
+                    {canDelete && (
+                      <button type="button" onClick={() => removeCementPlug(cp.id)} className="text-red-400 hover:text-red-600 ml-3">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       )}
 
+
       {/* CASING PHASES TABLE */}
-      {formMode === 'casing' && well.casings.length > 0 && (
+      {formMode === 'casing' && (well.casings || []).length > 0 && (
         <div className="space-y-3.5 border-t border-slate-100 pt-6">
           <div className="flex items-center gap-2">
             <h3 className="font-sans font-bold text-slate-800 text-sm uppercase tracking-wider">Casing Phases</h3>
@@ -782,8 +911,8 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <SortableContext items={well.casings.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-                    {well.casings.map((c, index) => (
+                  <SortableContext items={(well.casings || []).map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                    {(well.casings || []).map((c, index) => (
                       <SortableCasingRow
                         key={c.id}
                         c={c}
@@ -796,7 +925,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                           document.getElementById('wellbore_form_root')?.scrollIntoView({ behavior: 'smooth' });
                         }}
                         onDelete={() => {
-                          const newCasings = well.casings.filter(item => item.id !== c.id);
+                          const newCasings = (well.casings || []).filter(item => item.id !== c.id);
                           onChange({
                             ...well,
                             casings: newCasings,
@@ -839,9 +968,9 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                     <th className="px-3 py-2.5 text-right w-20">Actions</th>
                   </tr>
                 </thead>
-                <SortableContext items={well.tubings.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={(well.tubings || []).map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <tbody className="divide-y divide-slate-100">
-                    {calculateCoteProducts(well.tubings, well.spoolProd).map((t) => {
+                    {calculateCoteProducts(well.tubings || [], well.spoolProd).map((t) => {
                       return (
                         <SortableTubingRow 
                           key={t.id} 
@@ -861,7 +990,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                     })}
                     <tr className="bg-slate-100 font-bold border-t border-slate-200">
                       <td className="px-3 py-2.5" colSpan={5}></td>
-                      <td className="px-2 py-2.5 text-right font-mono text-slate-800">{well.tubings.reduce((sum, t) => sum + (t.length || 0), 0).toFixed(2)}</td>
+                      <td className="px-2 py-2.5 text-right font-mono text-slate-800">{(well.tubings || []).reduce((sum, t) => sum + (t.length || 0), 0).toFixed(2)}</td>
                       <td colSpan={4}></td>
                     </tr>
                   </tbody>

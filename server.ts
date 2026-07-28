@@ -10,7 +10,7 @@ import ws from "ws";
 import Database from "better-sqlite3";
 import {
   initDb, getDb, wasEverSynced, markSynced, runMigrations,
-  upsertEmployee, upsertWell, upsertCasing, upsertTubing, upsertPerforation, upsertToolType, upsertHistory
+  upsertEmployee, upsertWell, upsertCasing, upsertTubing, upsertPerforation, upsertToolType, upsertHistory, upsertCementPlug
 } from "./src/lib/localDb";
 
 // Polyfill WebSocket for older Node versions (like Node 20 inside Electron 33)
@@ -21,29 +21,27 @@ if (typeof globalThis.WebSocket === "undefined") {
 // Bypasses TLS cert validation to support corporate proxy SSL inspection
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-// Redirect server console logs to AppData/server.log in production
-if (process.env.USER_DATA_PATH) {
-  try {
-    const logFile = path.join(process.env.USER_DATA_PATH, "server.log");
-    const logStream = fs.createWriteStream(logFile, { flags: 'a' });
-    
-    const originalWrite = process.stdout.write.bind(process.stdout);
-    const originalErrWrite = process.stderr.write.bind(process.stderr);
+// Redirect server console logs to server_debug.log
+try {
+  const logFile = path.join(process.cwd(), "server_debug.log");
+  const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+  
+  const originalWrite = process.stdout.write.bind(process.stdout);
+  const originalErrWrite = process.stderr.write.bind(process.stderr);
 
-    process.stdout.write = (chunk: any, encoding?: any, callback?: any) => {
-      logStream.write(chunk);
-      return originalWrite(chunk, encoding, callback);
-    };
+  process.stdout.write = (chunk: any, encoding?: any, callback?: any) => {
+    logStream.write(chunk);
+    return originalWrite(chunk, encoding, callback);
+  };
 
-    process.stderr.write = (chunk: any, encoding?: any, callback?: any) => {
-      logStream.write(chunk);
-      return originalErrWrite(chunk, encoding, callback);
-    };
+  process.stderr.write = (chunk: any, encoding?: any, callback?: any) => {
+    logStream.write(chunk);
+    return originalErrWrite(chunk, encoding, callback);
+  };
 
-    console.log(`\n--- Server Startup at ${new Date().toISOString()} ---`);
-  } catch (e) {
-    console.error("Failed to initialize file logging:", e);
-  }
+  console.log(`\n--- Server Startup at ${new Date().toISOString()} ---`);
+} catch (e) {
+  console.error("Failed to initialize file logging:", e);
 }
 
 let envPath = ".env";
@@ -249,6 +247,51 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
+  app.get('/api/app/updater-log', (req, res) => {
+    try {
+      const userDataPath = process.env.USER_DATA_PATH || process.cwd();
+      const logPath = path.join(userDataPath, 'updater-activity.log');
+      if (fs.existsSync(logPath)) {
+        const content = fs.readFileSync(logPath, 'utf8');
+        return res.json({ log: content });
+      }
+      res.json({ log: 'No updater log found yet.' });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+  app.get('/api/app/update-check', async (req, res) => {
+    try {
+      const pkgPath = path.join(process.cwd(), 'package.json');
+      let currentVersion = '1.0.0';
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+        currentVersion = pkg.version || '1.0.0';
+      }
+
+      const response = await fetch('https://api.github.com/repos/HALIMOUVIC/TT/releases/latest', {
+        headers: { 'User-Agent': 'WellboreSchematicPro' }
+      });
+      if (!response.ok) {
+        return res.json({ hasUpdate: false, currentVersion });
+      }
+      const data = await response.json() as any;
+      const latestTag = (data.tag_name || '').replace(/^v/, '');
+      const downloadUrl = data.html_url || 'https://github.com/HALIMOUVIC/TT/releases/latest';
+
+      const hasUpdate = latestTag && latestTag !== currentVersion;
+      res.json({
+        hasUpdate,
+        currentVersion,
+        latestVersion: latestTag,
+        downloadUrl,
+        releaseNotes: data.body || ''
+      });
+    } catch (err) {
+      res.json({ hasUpdate: false, error: (err as Error).message });
+    }
+  });
+
   // ─── SQLite DB init & first-run Supabase sync ──────────────────────────────
   const userDataPath = process.env.USER_DATA_PATH || process.cwd();
   initDb(userDataPath);
@@ -271,14 +314,15 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       const { createClient } = await import("@supabase/supabase-js");
       const sb = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 
-      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes] = await Promise.all([
+      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes] = await Promise.all([
         sb.from("employees").select("*"),
         sb.from("wells").select("*"),
         sb.from("casing_strings").select("*"),
         sb.from("tubing_components").select("*"),
         sb.from("perforation_zones").select("*"),
         sb.from("custom_tool_types").select("*"),
-        sb.from("well_history").select("*")
+        sb.from("well_history").select("*"),
+        sb.from("cement_plugs").select("*")
       ]);
 
       const db = getDb();
@@ -290,6 +334,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         for (const p of perfsRes.data || []) upsertPerforation(p);
         for (const tt of toolsRes.data || []) upsertToolType(tt);
         for (const h of histRes.data || []) upsertHistory(h);
+        for (const cp of cementRes.data || []) upsertCementPlug(cp);
       });
       syncAll();
       markSynced();
@@ -301,8 +346,139 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
 
   tryInitialSupabaseSync();
 
+  let isSupabaseReachable = true;
+
+  // Helper to obtain active Supabase client or null (with offline & proxy fallback)
+  function getSupabase() {
+    if (process.env.OFFLINE_MODE === "true") {
+      return null;
+    }
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+    if (!url || !key || url.includes("your-project") || !url.startsWith("http")) {
+      return null;
+    }
+    try {
+      return createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+    } catch (err) {
+      console.warn("Proxy/Network warning creating Supabase client — falling back to local SQLite:", err);
+      isSupabaseReachable = false;
+      return null;
+    }
+  }
+
+  function formatError(err: any): string {
+    if (!err) return "Unknown error";
+    if (err instanceof Error) return err.message;
+    if (typeof err === "object") {
+      const msg = err.message || err.error_description || err.error || "";
+      const details = err.details ? ` (${err.details})` : "";
+      const code = err.code ? ` [Code: ${err.code}]` : "";
+      if (msg) return `${msg}${details}${code}`;
+      return JSON.stringify(err);
+    }
+    return String(err);
+  }
+
+  // Real-time synchronization helper from Supabase → SQLite with 3s proxy/offline timeout
+  async function syncFromSupabase() {
+    const sb = getSupabase();
+    if (!sb) {
+      isSupabaseReachable = false;
+      return;
+    }
+    try {
+      console.log("DEBUG: Syncing all tables from Supabase to SQLite...");
+      
+      const syncPromise = Promise.all([
+        sb.from("employees").select("*"),
+        sb.from("wells").select("*"),
+        sb.from("casing_strings").select("*"),
+        sb.from("tubing_components").select("*"),
+        sb.from("perforation_zones").select("*"),
+        sb.from("custom_tool_types").select("*"),
+        sb.from("well_history").select("*"),
+        sb.from("cement_plugs").select("*")
+      ]);
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Supabase proxy/network request timed out (3s limit)")), 3000)
+      );
+
+      const [empRes, wellsRes, casingsRes, tubingsRes, perfsRes, toolsRes, histRes, cementRes] = await Promise.race([
+        syncPromise,
+        timeoutPromise
+      ]);
+
+      if (empRes.error) throw empRes.error;
+      if (wellsRes.error) throw wellsRes.error;
+
+      isSupabaseReachable = true;
+
+      const db = getDb();
+      const syncAll = db.transaction(() => {
+        if (empRes.data) {
+          db.prepare("DELETE FROM employees").run();
+          for (const e of empRes.data) upsertEmployee(e);
+          console.log("DEBUG: Synced employees:", empRes.data.length);
+        }
+        if (wellsRes.data) {
+          db.prepare("DELETE FROM wells").run();
+          for (const w of wellsRes.data) upsertWell(w);
+          console.log("DEBUG: Synced wells:", wellsRes.data.length);
+        }
+        if (casingsRes.data) {
+          db.prepare("DELETE FROM casing_strings").run();
+          for (const c of casingsRes.data) upsertCasing(c);
+          console.log("DEBUG: Synced casings:", casingsRes.data.length);
+        }
+        if (tubingsRes.data) {
+          db.prepare("DELETE FROM tubing_components").run();
+          for (const t of tubingsRes.data) upsertTubing(t);
+          console.log("DEBUG: Synced tubings:", tubingsRes.data.length);
+        }
+        if (perfsRes.data) {
+          db.prepare("DELETE FROM perforation_zones").run();
+          for (const p of perfsRes.data) upsertPerforation(p);
+          console.log("DEBUG: Synced perforations:", perfsRes.data.length);
+        }
+        if (toolsRes.data) {
+          const localTools = db.prepare("SELECT id, display_order FROM custom_tool_types").all() as any[];
+          const localOrderMap = new Map<string, number>();
+          for (const lt of localTools) {
+            if (lt.id) localOrderMap.set(lt.id, lt.display_order || 0);
+          }
+
+          db.prepare("DELETE FROM custom_tool_types").run();
+          for (const tt of toolsRes.data) {
+            const preservedOrder = localOrderMap.get(tt.id) ?? 0;
+            upsertToolType({ ...tt, display_order: preservedOrder });
+          }
+          console.log("DEBUG: Synced tools:", toolsRes.data.length);
+        }
+        if (histRes.data) {
+          db.prepare("DELETE FROM well_history").run();
+          for (const h of histRes.data) upsertHistory(h);
+          console.log("DEBUG: Synced history:", histRes.data.length);
+        }
+        if (cementRes && (cementRes as any).data) {
+          db.prepare("DELETE FROM cement_plugs").run();
+          for (const cp of (cementRes as any).data) upsertCementPlug(cp);
+          console.log("DEBUG: Synced cement plugs:", (cementRes as any).data.length);
+        }
+      });
+      syncAll();
+      markSynced();
+      console.log("✅ Supabase → SQLite sync completed successfully!");
+    } catch (err) {
+      console.warn("Could not sync from Supabase, operating in local fallback mode:", err instanceof Error ? err.message : err);
+    }
+  }
+
   // Helper to build a well object from SQLite rows
-  function buildWellFromRows(row: any, casingsData: any[], tubingsData: any[], perfsData: any[], historyData: any[]) {
+  function buildWellFromRows(row: any, casingsData: any[], tubingsData: any[], perfsData: any[], historyData: any[], cementPlugsData: any[] = []) {
     const wellHistory = historyData.filter((h: any) => h.well_id === row.id);
     let maxFolio = 0;
     for (const h of wellHistory) {
@@ -354,6 +530,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       updatedDate: row.updated_date,
       endOperationDate: row.end_operation_date,
       vuBy: row.vu_by,
+      isAbandonProvisoire: !!row.is_abandon_provisoire,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       casings: casingsData.filter((c: any) => c.well_id === row.id)
@@ -385,28 +562,64 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
           perfoType: p.perfo_type, diameter: p.diameter,
           density: p.density != null ? Number(p.density) : undefined,
           shots: p.shots != null ? Number(p.shots) : undefined,
-          observations: p.observations, calage: p.calage
+          observations: p.observations, calage: p.calage, reservoir: p.reservoir
+        })),
+      cementPlugs: cementPlugsData.filter((cp: any) => cp.well_id === row.id)
+        .sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0))
+        .map((cp: any) => ({
+          id: cp.id,
+          topDepth: Number(cp.top_depth) || 0,
+          bottomDepth: Number(cp.bottom_depth) || 0,
+          observations: cp.observations || ''
         }))
     };
   }
 
-  // 0. DB status (now always local)
+  // 0. DB status & Proxy/Offline Mode
   app.get("/api/supabase/config-status", (req, res) => {
-    res.json({ hasUrl: true, hasKey: true, hasSecret: true, supabaseUrl: "local-sqlite", local: true });
+    const sb = getSupabase();
+    res.json({
+      hasUrl: !!process.env.SUPABASE_URL,
+      hasKey: !!(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY),
+      supabaseUrl: process.env.SUPABASE_URL || "local-sqlite",
+      local: true, // SQLite is ALWAYS available locally
+      offlineMode: process.env.OFFLINE_MODE === "true",
+      supabaseConnected: !!sb && isSupabaseReachable,
+      activeEngine: sb && isSupabaseReachable ? "Hybrid (SQLite + Supabase Cloud)" : "Local SQLite (Offline & Proxy Resilience Mode)"
+    });
   });
 
-  // 1. Test Connection (local SQLite — always succeeds)
-  app.post("/api/supabase/test-connection", (req, res) => {
+  // 1. Test Connection with auto fallback
+  app.post("/api/supabase/test-connection", async (req, res) => {
     try {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const timeoutPromise = new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Supabase proxy/network timeout")), 3000)
+          );
+          const queryPromise = sb.from("wells").select("*", { count: "exact", head: true });
+          const { count, error } = await Promise.race([queryPromise, timeoutPromise]);
+          if (error) throw error;
+          isSupabaseReachable = true;
+          return res.json({ success: true, message: `Connected to Supabase cloud database (${count} wells synced). Local SQLite active.` });
+        } catch (cloudErr) {
+          isSupabaseReachable = false;
+          console.warn("Supabase test connection failed (offline or proxy blocked) — using SQLite:", cloudErr);
+        }
+      }
       const db = getDb();
       const row = db.prepare("SELECT count(*) as c FROM wells").get() as any;
-      res.json({ success: true, message: `Connected to local SQLite database (${row.c} wells stored).` });
+      res.json({
+        success: true,
+        message: `Connected to local SQLite database engine (${row.c} wells stored on PC). Proxy & Offline resilient.`
+      });
     } catch (error) {
-      res.status(500).json({ success: false, error: error instanceof Error ? error.message : "SQLite error" });
+      res.status(500).json({ success: false, error: error instanceof Error ? error.message : "Database connection error" });
     }
   });
 
-  // 2. Push/Save Well(s) to SQLite
+  // 2. Push/Save Well(s)
   app.post("/api/supabase/push-wells", async (req, res) => {
     try {
       const { wells, updateFolio, updateWellId, editedBy } = req.body;
@@ -415,6 +628,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       }
 
       const db = getDb();
+      const sb = getSupabase();
       const results: { id: string; name: string; success: boolean; error?: string; folio?: string; folioToCancel?: string }[] = [];
 
       for (const well of wells) {
@@ -437,12 +651,54 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
             well.folioToCancel = String(Math.max(0, parseInt(folioStr, 10) - 1)).padStart(2, "0");
           } else {
             const histRows = db.prepare("SELECT folio FROM well_history WHERE well_id = ?").all(well.id) as any[];
-            let maxFolio = 0;
-            for (const r of histRows) { const f = parseInt(r.folio, 10); if (!isNaN(f) && f > maxFolio) maxFolio = f; }
-            well.folio = String(maxFolio + 1).padStart(2, "0");
-            well.folioToCancel = String(maxFolio).padStart(2, "0");
+            if (histRows.length === 0) {
+              // Initial folio for new well without history in database
+              const userManualFolio = parseInt(well.folio || "1", 10);
+              const initialFolioNum = !isNaN(userManualFolio) && userManualFolio > 0 ? userManualFolio : 1;
+              well.folio = String(initialFolioNum).padStart(2, "0");
+              well.folioToCancel = String(Math.max(0, initialFolioNum - 1)).padStart(2, "0");
+            } else {
+              let maxFolio = 0;
+              for (const r of histRows) { const f = parseInt(r.folio, 10); if (!isNaN(f) && f > maxFolio) maxFolio = f; }
+              well.folio = String(maxFolio + 1).padStart(2, "0");
+              well.folioToCancel = String(maxFolio).padStart(2, "0");
+            }
           }
 
+          const nowIso = new Date().toISOString();
+          const userEditor = editedBy || well.editedBy || "";
+
+          let existingCreatedAt: string | undefined;
+          try {
+            const localRow = db.prepare("SELECT created_at FROM well_history WHERE well_id = ? AND folio = ?")
+              .get(well.id, well.folio || "00") as any;
+            if (localRow && localRow.created_at) {
+              existingCreatedAt = localRow.created_at;
+            }
+          } catch (_) {}
+
+          if (!existingCreatedAt && sb) {
+            try {
+              const { data: existingHist } = await sb
+                .from("well_history")
+                .select("created_at")
+                .eq("well_id", well.id)
+                .eq("folio", well.folio || "00")
+                .maybeSingle();
+              if (existingHist && existingHist.created_at) {
+                existingCreatedAt = existingHist.created_at;
+              }
+            } catch (_) {}
+          }
+
+          const snapshotWell = {
+            ...well,
+            editedBy: userEditor,
+            updatedAt: nowIso
+          };
+          delete (snapshotWell as any).saveAsFolio;
+
+          // 1. ALWAYS save to local SQLite first (guarantees local persistence & history snapshot)
           const saveWell = db.transaction(() => {
             // A. Upsert well
             upsertWell({
@@ -467,6 +723,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
               observations: well.observations || "", folio: well.folio || "", folio_to_cancel: well.folioToCancel || "",
               prod_tbg_od: well.prodTbgParams?.od || "", prod_tbg_grade: well.prodTbgParams?.grade || "", prod_tbg_weight: well.prodTbgParams?.weight || "",
               updated_date: well.updatedDate || "", end_operation_date: well.endOperationDate || "", vu_by: well.vuBy || "",
+              is_abandon_provisoire: well.isAbandonProvisoire ? 1 : 0,
               updated_at: new Date().toISOString()
             });
 
@@ -493,7 +750,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 id: t.id || `tubing-${well.id}-${index}-${Date.now()}`,
                 well_id: well.id, name: t.name || "Tubing Component", type: t.type || "Tubing",
                 od: t.od || "", length: Number(t.length) || 0, bottom_depth: Number(t.bottomDepth) || 0,
-                is_cote_product_added: !!t.isCoteProductAdded, observations: t.observations || "",
+                is_cote_product_added: t.isCoteProductAdded ? 1 : 0, observations: t.observations || "",
                 qty: t.qty || "", custom_type: t.customType || "", min_id: t.minId || "", display_order: index + 1
               });
             }
@@ -507,29 +764,201 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
                 perfo_type: p.perfoType || "", diameter: p.diameter || "",
                 density: p.density != null ? Number(p.density) : null,
                 shots: p.shots != null ? Number(p.shots) : null,
-                observations: p.observations || "", calage: p.calage || "", display_order: index + 1
+                observations: p.observations || "", calage: p.calage || "", reservoir: p.reservoir || "", display_order: index + 1
               });
             }
 
-            // E. History snapshot
-            const snapshotWell = { ...well };
-            delete (snapshotWell as any).saveAsFolio;
+            // E. Cement Plugs (B.C)
+            db.prepare("DELETE FROM cement_plugs WHERE well_id = ?").run(well.id);
+            for (const [index, cp] of (well.cementPlugs || []).entries()) {
+              upsertCementPlug({
+                id: cp.id || `bc-${well.id}-${index}-${Date.now()}`,
+                well_id: well.id,
+                top_depth: Number(cp.topDepth) || 0,
+                bottom_depth: Number(cp.bottomDepth) || 0,
+                observations: cp.observations || '',
+                display_order: index + 1
+              });
+            }
+
+            // F. History snapshot
             upsertHistory({
               id: `history-${well.id}-${well.folio}-${Date.now()}`,
               well_id: well.id, folio: well.folio || "00",
               snapshot: JSON.stringify(snapshotWell),
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              edited_by: editedBy || "Abdelhalim"
+              created_at: existingCreatedAt || nowIso,
+              updated_at: nowIso,
+              edited_by: userEditor
             });
           });
 
           saveWell();
+
+          // 2. Sync to Supabase in background / try-catch
+          if (sb) {
+            try {
+              const wellData = {
+                id: well.id,
+                name: well.name || "NEW WELL",
+                purpose: well.purpose || "Oil Producer",
+                completion_type: well.completionType || "COMPLETION SIMPLE",
+                reservoir: well.reservoir || "",
+                field: well.field || "",
+                elevation_sol: Number(well.elevationSol) || 0,
+                elevation_forage: Number(well.elevationForage) || 0,
+                elevation_production: Number(well.elevationProduction) || 0,
+                spool_prod: well.spoolProd || "",
+                packer_type: well.packerType || "",
+                susp_tbg: well.suspTbg || "",
+                etan_tbg: well.etanTbg || "",
+                origine_cotes: well.origineCotes || "",
+                xmas_tree_brand: well.xmasTreeBrand || "",
+                xmas_tree_type: well.xmasTreeType || "",
+                xmas_tree_ract_sup: well.xmasTreeRactSup || "",
+                xmas_tree_pressure: well.xmasTreePressure || "",
+                xmas_tree_attache_tbg: well.xmasTreeAttacheTbg || "",
+                xmas_tree_embase: well.xmasTreeEmbase || "",
+                xmas_tree_reduction: well.xmasTreeReduction || "",
+                xmas_tree_olive: well.xmasTreeOlive || "",
+                vannes_sas_marque: well.vannesSasMarque || "",
+                vannes_sas_nombre: well.vannesSasNombre || "",
+                vannes_sas_serie: well.vannesSasSerie || "",
+                vannes_maitresse_marque: well.vannesMaitresseMarque || "",
+                vannes_maitresse_nombre: well.vannesMaitresseNombre || "",
+                vannes_maitresse_serie: well.vannesMaitresseSerie || "",
+                vannes_lat_tbg_marque: well.vannesLatTbgMarque || "",
+                vannes_lat_tbg_nombre: well.vannesLatTbgNombre || "",
+                vannes_lat_tbg_serie: well.vannesLatTbgSerie || "",
+                vannes_lat_csg_marque: well.vannesLatCsgMarque || "",
+                vannes_lat_csg_nombre: well.vannesLatCsgNombre || "",
+                vannes_lat_csg_serie: well.vannesLatCsgSerie || "",
+                observations: well.observations || "",
+                folio: well.folio || "",
+                folio_to_cancel: well.folioToCancel || "",
+                prod_tbg_od: well.prodTbgParams?.od || "",
+                prod_tbg_grade: well.prodTbgParams?.grade || "",
+                prod_tbg_weight: well.prodTbgParams?.weight || "",
+                updated_date: well.updatedDate || "",
+                end_operation_date: well.endOperationDate || "",
+                vu_by: well.vuBy || "",
+                is_abandon_provisoire: well.isAbandonProvisoire ? true : false,
+                updated_at: new Date().toISOString()
+              };
+
+              let { error: wellErr } = await sb.from("wells").upsert(wellData);
+              if (wellErr && (wellErr.message?.includes("is_abandon_provisoire") || String(wellErr).includes("is_abandon_provisoire"))) {
+                delete (wellData as any).is_abandon_provisoire;
+                await sb.from("wells").upsert(wellData);
+              }
+
+              await sb.from("casing_strings").delete().eq("well_id", well.id);
+              if (well.casings && well.casings.length > 0) {
+                const casingsToInsert = well.casings.map((c: any, index: number) => ({
+                  id: c.id || `casing-${well.id}-${index}-${Date.now()}`,
+                  well_id: well.id,
+                  name: c.name || "Casing String",
+                  borehole_size: String(c.boreholeSize || ""),
+                  casing_size: String(c.casingSize || ""),
+                  top_depth: Number(c.topDepth) || 0,
+                  shoe_depth: Number(c.shoeDepth) || 0,
+                  drilled_depth: Number(c.drilledDepth) || 0,
+                  top_of_cement: c.topOfCement != null ? Number(c.topOfCement) : null,
+                  top_of_liner: c.topOfLiner != null ? Number(c.topOfLiner) : null,
+                  top_of_fonde: c.topOfFonde != null ? Number(c.topOfFonde) : null,
+                  grade: c.grade || "",
+                  weight: c.weight != null ? Number(c.weight) : null,
+                  connection: c.connection || "",
+                  observations: c.observations || "",
+                  display_order: index + 1
+                }));
+                let { error: cErr } = await sb.from("casing_strings").insert(casingsToInsert);
+                if (cErr && (cErr.message?.includes("top_of_fonde") || String(cErr).includes("top_of_fonde"))) {
+                  const fallbackCasings = casingsToInsert.map(({ top_of_fonde, ...rest }) => rest);
+                  await sb.from("casing_strings").insert(fallbackCasings);
+                }
+              }
+
+              await sb.from("tubing_components").delete().eq("well_id", well.id);
+              if (well.tubings && well.tubings.length > 0) {
+                const tubingsToInsert = well.tubings.map((t: any, index: number) => ({
+                  id: t.id || `tubing-${well.id}-${index}-${Date.now()}`,
+                  well_id: well.id,
+                  name: t.name || "Tubing Component",
+                  type: t.type || "Tubing",
+                  od: t.od || "",
+                  length: Number(t.length) || 0,
+                  bottom_depth: Number(t.bottomDepth) || 0,
+                  is_cote_product_added: t.isCoteProductAdded ? true : false,
+                  observations: t.observations || "",
+                  qty: t.qty || "",
+                  custom_type: t.customType || "",
+                  min_id: t.minId || "",
+                  display_order: index + 1
+                }));
+                await sb.from("tubing_components").insert(tubingsToInsert);
+              }
+
+              await sb.from("perforation_zones").delete().eq("well_id", well.id);
+              if (well.perforations && well.perforations.length > 0) {
+                const perfsToInsert = well.perforations.map((p: any, index: number) => ({
+                  id: p.id || `perf-${well.id}-${index}-${Date.now()}`,
+                  well_id: well.id,
+                  top_depth: Number(p.topDepth) || 0,
+                  bottom_depth: Number(p.bottomDepth) || 0,
+                  perfo_type: p.perfoType || "",
+                  diameter: p.diameter || "",
+                  density: p.density != null ? Number(p.density) : null,
+                  shots: p.shots != null ? Number(p.shots) : null,
+                  observations: p.observations || "",
+                  calage: p.calage || "",
+                  reservoir: p.reservoir || "",
+                  display_order: index + 1
+                }));
+                let { error: pErr } = await sb.from("perforation_zones").insert(perfsToInsert);
+                if (pErr && (pErr.message?.includes("reservoir") || String(pErr).includes("reservoir"))) {
+                  // Fallback if reservoir column is not yet present on remote Supabase DB
+                  const fallbackPerfs = perfsToInsert.map(({ reservoir, ...rest }) => rest);
+                  await sb.from("perforation_zones").insert(fallbackPerfs);
+                }
+              }
+
+              // Cement plugs — delete then insert
+              await sb.from("cement_plugs").delete().eq("well_id", well.id);
+              if (well.cementPlugs && well.cementPlugs.length > 0) {
+                const plugsToInsert = well.cementPlugs.map((cp: any, index: number) => ({
+                  id: cp.id || `bc-${well.id}-${index}-${Date.now()}`,
+                  well_id: well.id,
+                  top_depth: Number(cp.topDepth) || 0,
+                  bottom_depth: Number(cp.bottomDepth) || 0,
+                  observations: cp.observations || '',
+                  display_order: index + 1
+                }));
+                const { error: bcErr } = await sb.from("cement_plugs").insert(plugsToInsert);
+                if (bcErr) console.warn("cement_plugs insert warning:", bcErr.message);
+              }
+
+              const snapshotStr = JSON.stringify(snapshotWell);
+              console.log(`DEBUG history snapshot cementPlugs count: ${(snapshotWell.cementPlugs || []).length}`);
+              await sb.from("well_history").upsert({
+                id: `history-${well.id}-${well.folio}-${Date.now()}`,
+                well_id: well.id,
+                folio: well.folio || "00",
+                snapshot: snapshotStr,
+                created_at: existingCreatedAt || nowIso,
+                updated_at: nowIso,
+                edited_by: userEditor
+              }, {
+                onConflict: "well_id,folio"
+              });
+            } catch (sbErr) {
+              console.warn("Supabase background push warning:", sbErr);
+            }
+          }
           results.push({ id: well.id, name: well.name, success: true, folio: well.folio, folioToCancel: well.folioToCancel });
         } catch (wellErr) {
           console.error(`Error saving well ${well.name}:`, wellErr);
-          results.push({ id: well.id, name: well.name, success: false,
-            error: wellErr instanceof Error ? wellErr.message : "Failed to save" });
+          const errMsg = formatError(wellErr);
+          results.push({ id: well.id, name: well.name, success: false, error: errMsg });
         }
       }
 
@@ -540,32 +969,39 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  // 2.5 Delete Well from SQLite
-  app.post("/api/supabase/delete-well", (req, res) => {
+  // 2.5 Delete Well
+  app.post("/api/supabase/delete-well", async (req, res) => {
     try {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "Missing well id to delete" });
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("wells").delete().eq("id", id);
+        if (error) throw error;
+      }
       const db = getDb();
       db.prepare("DELETE FROM wells WHERE id = ?").run(id);
-      res.json({ success: true, message: `Well ${id} deleted from local database.` });
+      res.json({ success: true, message: `Well ${id} deleted successfully.` });
     } catch (error) {
       console.error("Delete well error:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Deletion failed" });
     }
   });
 
-  // 3. Pull Wells from SQLite
-  app.post("/api/supabase/pull-wells", (req, res) => {
+  // 3. Pull Wells
+  app.post("/api/supabase/pull-wells", async (req, res) => {
     try {
+      await syncFromSupabase();
       const db = getDb();
       const wellsData = db.prepare("SELECT * FROM wells ORDER BY name ASC").all() as any[];
       const casingsData = db.prepare("SELECT * FROM casing_strings").all() as any[];
       const tubingsData = db.prepare("SELECT * FROM tubing_components").all() as any[];
       const perfsData = db.prepare("SELECT * FROM perforation_zones").all() as any[];
       const historyData = db.prepare("SELECT well_id, folio FROM well_history").all() as any[];
+      const cementPlugsData = db.prepare("SELECT * FROM cement_plugs").all() as any[];
 
       const reconstructedWells = wellsData.map((row: any) => {
-        return buildWellFromRows(row, casingsData, tubingsData, perfsData, historyData);
+        return buildWellFromRows(row, casingsData, tubingsData, perfsData, historyData, cementPlugsData);
       });
 
       res.json({ success: true, wells: reconstructedWells });
@@ -575,9 +1011,34 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  // Custom Tool Types — SQLite CRUD
-  app.get("/api/supabase/custom-tool-types", (req, res) => {
+  // Custom Tool Types — CRUD
+  app.get("/api/supabase/custom-tool-types", async (req, res) => {
     try {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("custom_tool_types").select("*");
+          if (!error && data) {
+            const db = getDb();
+            const localTools = db.prepare("SELECT id, display_order FROM custom_tool_types").all() as any[];
+            const localOrderMap = new Map<string, number>();
+            for (const lt of localTools) {
+              if (lt.id) localOrderMap.set(lt.id, lt.display_order || 0);
+            }
+
+            const syncTools = db.transaction(() => {
+              db.prepare("DELETE FROM custom_tool_types").run();
+              for (const tt of data) {
+                const preservedOrder = localOrderMap.get(tt.id) ?? 0;
+                upsertToolType({ ...tt, display_order: preservedOrder });
+              }
+            });
+            syncTools();
+          }
+        } catch (e) {
+          console.warn("Could not sync tool types before GET:", e);
+        }
+      }
       const data = getDb().prepare("SELECT * FROM custom_tool_types ORDER BY display_order ASC, rowid ASC").all();
       res.json({ success: true, data });
     } catch (error) {
@@ -585,7 +1046,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.put("/api/supabase/custom-tool-types/reorder", (req, res) => {
+  app.put("/api/supabase/custom-tool-types/reorder", async (req, res) => {
     try {
       const { items } = req.body; // array of tool objects or { id, display_order }
       if (!Array.isArray(items)) {
@@ -610,10 +1071,25 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.post("/api/supabase/custom-tool-types", (req, res) => {
+  app.post("/api/supabase/custom-tool-types", async (req, res) => {
     try {
       const { type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order } = req.body;
-      const id = `tooltype-${Date.now()}`;
+      const id = crypto.randomUUID();
+      
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("custom_tool_types").insert({
+          id,
+          type,
+          default_name,
+          default_od: default_od || "2'7/8",
+          default_custom_type: default_custom_type || "EU",
+          default_min_id: default_min_id || "",
+          french_designation: french_designation || ""
+        });
+        if (error) throw error;
+      }
+
       upsertToolType({ id, type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order: display_order || 0 });
       const data = getDb().prepare("SELECT * FROM custom_tool_types WHERE id = ?").get(id);
       res.json({ success: true, data });
@@ -622,10 +1098,24 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.put("/api/supabase/custom-tool-types/:id", (req, res) => {
+  app.put("/api/supabase/custom-tool-types/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const { type, default_name, default_od, default_custom_type, default_min_id, french_designation, display_order } = req.body;
+      
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("custom_tool_types").update({
+          type,
+          default_name,
+          default_od,
+          default_custom_type,
+          default_min_id,
+          french_designation
+        }).eq("id", id);
+        if (error) throw error;
+      }
+
       const existing = getDb().prepare("SELECT id FROM custom_tool_types WHERE id = ?").get(id);
       if (!existing) return res.status(404).json({ success: false, error: "Tool type not found" });
       getDb().prepare(`UPDATE custom_tool_types SET type=@type, default_name=@default_name, default_od=@default_od,
@@ -641,18 +1131,51 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.delete("/api/supabase/custom-tool-types/:id", (req, res) => {
+  app.delete("/api/supabase/custom-tool-types/:id", async (req, res) => {
     try {
-      getDb().prepare("DELETE FROM custom_tool_types WHERE id = ?").run(req.params.id);
+      const { id } = req.params;
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("custom_tool_types").delete().eq("id", id);
+        if (error) throw error;
+      }
+      getDb().prepare("DELETE FROM custom_tool_types WHERE id = ?").run(id);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to delete tool type" });
     }
   });
 
-  // Well History — SQLite CRUD
-  app.get("/api/supabase/well-history/:wellId", (req, res) => {
+  // Well History — CRUD
+  app.get("/api/supabase/well-history/:wellId", async (req, res) => {
     try {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("well_history").select("*").eq("well_id", req.params.wellId);
+          if (!error && data) {
+            const db = getDb();
+            const syncHist = db.transaction(() => {
+              db.prepare("DELETE FROM well_history WHERE well_id = ?").run(req.params.wellId);
+              for (const h of data) upsertHistory(h);
+            });
+            syncHist();
+          }
+        } catch (e) {
+          console.warn("Could not sync well history before GET:", e);
+        }
+      }
+      // Load current cement plugs for this well to enrich snapshots that are missing them
+      const currentCementPlugs = getDb().prepare(
+        "SELECT * FROM cement_plugs WHERE well_id = ? ORDER BY display_order ASC"
+      ).all(req.params.wellId) as any[];
+      const mappedCementPlugs = currentCementPlugs.map((cp: any) => ({
+        id: cp.id,
+        topDepth: Number(cp.top_depth) || 0,
+        bottomDepth: Number(cp.bottom_depth) || 0,
+        observations: cp.observations || ''
+      }));
+
       const rows = getDb().prepare(
         "SELECT id, folio, snapshot, created_at, updated_at, edited_by FROM well_history WHERE well_id = ? ORDER BY CAST(folio AS INTEGER) DESC"
       ).all(req.params.wellId) as any[];
@@ -661,7 +1184,15 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         if (typeof snapshot === "string") {
           try { snapshot = JSON.parse(snapshot); } catch { /* keep as string */ }
         }
-        return { ...row, snapshot };
+        // Enrich snapshot with current cement plugs if the snapshot is missing them
+        if (snapshot && typeof snapshot === "object" && (!snapshot.cementPlugs || snapshot.cementPlugs.length === 0) && mappedCementPlugs.length > 0) {
+          snapshot = { ...snapshot, cementPlugs: mappedCementPlugs };
+          console.log(`DEBUG: Enriched folio ${row.folio} snapshot with ${mappedCementPlugs.length} cement plug(s)`);
+        }
+        console.log(`DEBUG history row folio=${row.folio} cementPlugs count=${(snapshot && snapshot.cementPlugs || []).length}`);
+        const editedBy = row.edited_by || (snapshot && (snapshot.editedBy || snapshot.edited_by)) || "";
+        const updatedAt = row.updated_at || (snapshot && (snapshot.updatedAt || snapshot.updated_at)) || row.created_at;
+        return { ...row, snapshot, edited_by: editedBy, updated_at: updatedAt };
       });
       res.json({ success: true, history });
     } catch (error) {
@@ -669,9 +1200,15 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.delete("/api/supabase/well-history/:historyId", (req, res) => {
+  app.delete("/api/supabase/well-history/:historyId", async (req, res) => {
     try {
-      getDb().prepare("DELETE FROM well_history WHERE id = ?").run(req.params.historyId);
+      const { historyId } = req.params;
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("well_history").delete().eq("id", historyId);
+        if (error) throw error;
+      }
+      getDb().prepare("DELETE FROM well_history WHERE id = ?").run(historyId);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to delete history" });
@@ -804,25 +1341,53 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     return extracted;
   }
 
-  // Authentication Login — SQLite
-  app.post("/api/auth/login", (req, res) => {
+  // Authentication Login
+  app.post("/api/auth/login", async (req, res) => {
     try {
       const { nom_prenom, password } = req.body;
       if (!nom_prenom || !password) {
         return res.status(400).json({ success: false, error: "Nom & Prénom and password are required" });
       }
 
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("employees").select("*");
+          if (!error && data) {
+            const db = getDb();
+            const syncEmp = db.transaction(() => {
+              db.prepare("DELETE FROM employees").run();
+              for (const e of data) upsertEmployee(e);
+            });
+            syncEmp();
+          }
+        } catch (e) {
+          console.warn("Could not sync employees before login:", e);
+        }
+      }
+
       const db = getDb();
       const allEmployees = db.prepare(
-        "SELECT id, matricule, nom_prenom, role, password FROM employees"
+        "SELECT * FROM employees"
       ).all() as any[];
 
       const trimmedInput = nom_prenom.trim().toLowerCase();
+      const strippedInput = trimmedInput.replace(/\s+/g, "");
       
       // 1. Try exact match first (case-insensitive and trimmed)
       let data = allEmployees.find(e => (e.nom_prenom || '').trim().toLowerCase() === trimmedInput);
 
-      // 2. If no exact match, try a smart word-by-word match (handles reversed first/last name order)
+      // 2. If no exact match, try matricule match (e.g. 60790J)
+      if (!data) {
+        data = allEmployees.find(e => (e.matricule || '').trim().toLowerCase() === trimmedInput);
+      }
+
+      // 3. Try space-stripped match (handles OULED HAIMOUDA vs OULEDHAIMOUDA)
+      if (!data) {
+        data = allEmployees.find(e => (e.nom_prenom || '').toLowerCase().replace(/\s+/g, "") === strippedInput);
+      }
+
+      // 4. Try word-by-word match (handles reversed first/last name order)
       if (!data) {
         const words = trimmedInput.split(/\s+/).filter(Boolean);
         if (words.length > 0) {
@@ -879,12 +1444,20 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  // Change password endpoint — called after first login or when user wants to update
-  app.post("/api/auth/change-password", (req, res) => {
+  // Change password endpoint
+  app.post("/api/auth/change-password", async (req, res) => {
     try {
       const { employee_id, new_password } = req.body;
       if (!employee_id || !new_password || new_password.trim().length < 4) {
         return res.status(400).json({ success: false, error: "Données invalides" });
+      }
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("employees").update({
+          password: new_password.trim()
+        }).eq("id", employee_id);
+        if (error) throw error;
       }
 
       const db = getDb();
@@ -892,7 +1465,7 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         "UPDATE employees SET password = ? WHERE id = ?"
       ).run(new_password.trim(), employee_id);
 
-      if (result.changes === 0) {
+      if (result.changes === 0 && !sb) {
         return res.status(404).json({ success: false, error: "Employé introuvable" });
       }
 
@@ -903,12 +1476,28 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  // Employee Management CRUD — Owner Only
-  app.get("/api/employees", (req, res) => {
+  // Employee Management CRUD
+  app.get("/api/employees", async (req, res) => {
     try {
+      const sb = getSupabase();
+      if (sb) {
+        try {
+          const { data, error } = await sb.from("employees").select("*");
+          if (!error && data) {
+            const db = getDb();
+            const syncEmp = db.transaction(() => {
+              db.prepare("DELETE FROM employees").run();
+              for (const e of data) upsertEmployee(e);
+            });
+            syncEmp();
+          }
+        } catch (e) {
+          console.warn("Could not sync employees before GET:", e);
+        }
+      }
       const db = getDb();
       const data = db.prepare(
-        "SELECT id, matricule, nom_prenom, role, personnel, fonction, service, observation, created_at FROM employees ORDER BY id DESC"
+        "SELECT * FROM employees ORDER BY id DESC"
       ).all();
       res.json({ success: true, data });
     } catch (error: any) {
@@ -916,21 +1505,18 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.post("/api/employees", (req, res) => {
+  app.post("/api/employees", async (req, res) => {
     try {
-      const { matricule, nom_prenom, role, password, personnel, fonction, service, observation } = req.body;
+      const { matricule, nom_prenom, role, password, personnel, fonction, service, observation, d_rec, d_f_contrat, t_combinaison, t_blouson, t_pantalon, t_parka, t_pantalon_ord, t_chemise_ord, t_tshirt_ord, t_pull, p_chaussure, t_veste_cuire } = req.body;
       if (!nom_prenom || !nom_prenom.trim()) {
         return res.status(400).json({ success: false, error: "Le nom et prénom est obligatoire." });
       }
-      const db = getDb();
+      
       const empMatricule = (matricule || `EMP${Date.now().toString().slice(-4)}`).trim();
       const empRole = (role || 'user').trim().toLowerCase();
       const empPassword = password && password.trim() ? password.trim() : empMatricule;
 
-      const info = db.prepare(`
-        INSERT INTO employees (matricule, nom_prenom, role, password, personnel, fonction, service, observation)
-        VALUES (@matricule, @nom_prenom, @role, @password, @personnel, @fonction, @service, @observation)
-      `).run({
+      const payload = {
         matricule: empMatricule,
         nom_prenom: nom_prenom.trim(),
         role: empRole,
@@ -938,31 +1524,57 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         personnel: personnel || '',
         fonction: fonction || '',
         service: service || '',
-        observation: observation || ''
-      });
+        observation: observation || '',
+        d_rec: d_rec || null,
+        d_f_contrat: d_f_contrat || null,
+        t_combinaison: t_combinaison || null,
+        t_blouson: t_blouson || null,
+        t_pantalon: t_pantalon || null,
+        t_parka: t_parka || null,
+        t_pantalon_ord: t_pantalon_ord || null,
+        t_chemise_ord: t_chemise_ord || null,
+        t_tshirt_ord: t_tshirt_ord || null,
+        t_pull: t_pull || null,
+        p_chaussure: p_chaussure || null,
+        t_veste_cuire: t_veste_cuire || null
+      };
 
+      const sb = getSupabase();
+      let insertedId = null;
+      if (sb) {
+        const { data, error } = await sb.from("employees").insert(payload).select().single();
+        if (error) throw error;
+        insertedId = data.id;
+        upsertEmployee(data);
+      } else {
+        const db = getDb();
+        const info = db.prepare(`
+          INSERT INTO employees (matricule, nom_prenom, role, password, personnel, fonction, service, observation, d_rec, d_f_contrat, t_combinaison, t_blouson, t_pantalon, t_parka, t_pantalon_ord, t_chemise_ord, t_tshirt_ord, t_pull, p_chaussure, t_veste_cuire)
+          VALUES (@matricule, @nom_prenom, @role, @password, @personnel, @fonction, @service, @observation, @d_rec, @d_f_contrat, @t_combinaison, @t_blouson, @t_pantalon, @t_parka, @t_pantalon_ord, @t_chemise_ord, @t_tshirt_ord, @t_pull, @p_chaussure, @t_veste_cuire)
+        `).run(payload);
+        insertedId = info.lastInsertRowid;
+      }
+
+      const db = getDb();
       const newEmp = db.prepare(
-        "SELECT id, matricule, nom_prenom, role, personnel, fonction, service, observation, created_at FROM employees WHERE id = ?"
-      ).get(info.lastInsertRowid);
+        "SELECT * FROM employees WHERE id = ?"
+      ).get(insertedId);
       res.json({ success: true, data: newEmp });
     } catch (error: any) {
+      console.error("Create employee error:", error);
       res.status(500).json({ success: false, error: error?.message || "Failed to create employee" });
     }
   });
 
-  app.put("/api/employees/:id", (req, res) => {
+  app.put("/api/employees/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { matricule, nom_prenom, role, personnel, fonction, service, observation } = req.body;
+      const { matricule, nom_prenom, role, personnel, fonction, service, observation, d_rec, d_f_contrat, t_combinaison, t_blouson, t_pantalon, t_parka, t_pantalon_ord, t_chemise_ord, t_tshirt_ord, t_pull, p_chaussure, t_veste_cuire } = req.body;
       if (!nom_prenom || !nom_prenom.trim()) {
         return res.status(400).json({ success: false, error: "Le nom et prénom est obligatoire." });
       }
-      const db = getDb();
-      db.prepare(`
-        UPDATE employees SET matricule=@matricule, nom_prenom=@nom_prenom, role=@role,
-          personnel=@personnel, fonction=@fonction, service=@service, observation=@observation
-        WHERE id=@id
-      `).run({
+
+      const payload = {
         id,
         matricule: (matricule || '').trim(),
         nom_prenom: nom_prenom.trim(),
@@ -970,25 +1582,61 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
         personnel: personnel || '',
         fonction: fonction || '',
         service: service || '',
-        observation: observation || ''
-      });
+        observation: observation || '',
+        d_rec: d_rec || null,
+        d_f_contrat: d_f_contrat || null,
+        t_combinaison: t_combinaison || null,
+        t_blouson: t_blouson || null,
+        t_pantalon: t_pantalon || null,
+        t_parka: t_parka || null,
+        t_pantalon_ord: t_pantalon_ord || null,
+        t_chemise_ord: t_chemise_ord || null,
+        t_tshirt_ord: t_tshirt_ord || null,
+        t_pull: t_pull || null,
+        p_chaussure: p_chaussure || null,
+        t_veste_cuire: t_veste_cuire || null
+      };
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("employees").update(payload).eq("id", id);
+        if (error) throw error;
+      }
+
+      const db = getDb();
+      db.prepare(`
+        UPDATE employees SET matricule=@matricule, nom_prenom=@nom_prenom, role=@role,
+          personnel=@personnel, fonction=@fonction, service=@service, observation=@observation,
+          d_rec=@d_rec, d_f_contrat=@d_f_contrat, t_combinaison=@t_combinaison, t_blouson=@t_blouson,
+          t_pantalon=@t_pantalon, t_parka=@t_parka, t_pantalon_ord=@t_pantalon_ord, t_chemise_ord=@t_chemise_ord,
+          t_tshirt_ord=@t_tshirt_ord, t_pull=@t_pull, p_chaussure=@p_chaussure, t_veste_cuire=@t_veste_cuire
+        WHERE id=@id
+      `).run(payload);
 
       const updated = db.prepare(
-        "SELECT id, matricule, nom_prenom, role, personnel, fonction, service, observation, created_at FROM employees WHERE id = ?"
+        "SELECT * FROM employees WHERE id = ?"
       ).get(id);
       res.json({ success: true, data: updated });
     } catch (error: any) {
+      console.error("Update employee error:", error);
       res.status(500).json({ success: false, error: error?.message || "Failed to update employee" });
     }
   });
 
-  app.put("/api/employees/:id/password", (req, res) => {
+  app.put("/api/employees/:id/password", async (req, res) => {
     try {
       const { id } = req.params;
       const { password } = req.body;
       if (!password || password.trim().length < 3) {
         return res.status(400).json({ success: false, error: "Le mot de passe doit comporter au moins 3 caractères." });
       }
+
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("employees").update({ password: password.trim() }).eq("id", id);
+        if (error) throw error;
+      }
+
       const db = getDb();
       db.prepare("UPDATE employees SET password = ? WHERE id = ?").run(password.trim(), id);
       res.json({ success: true });
@@ -997,9 +1645,14 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
     }
   });
 
-  app.delete("/api/employees/:id", (req, res) => {
+  app.delete("/api/employees/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const sb = getSupabase();
+      if (sb) {
+        const { error } = await sb.from("employees").delete().eq("id", id);
+        if (error) throw error;
+      }
       const db = getDb();
       db.prepare("DELETE FROM employees WHERE id = ?").run(id);
       res.json({ success: true });

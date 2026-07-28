@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { WellData, CasingString, TubingComponent, PerforationZone } from '../types';
+import { WellData, CasingString, TubingComponent, PerforationZone, CementPlug } from '../types';
 import {
   parseSizeToNumber,
   formatDepth,
@@ -37,6 +37,20 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
       return 'compact';
     }
   });
+
+  const perfsForRes = well.perforations || [];
+  const reservoirNames = Array.from(new Set(perfsForRes.map(p => p.reservoir || well.reservoir || 'Général').filter(Boolean)));
+
+  const [selectedPerfRes, setSelectedPerfRes] = useState<Record<string, boolean>>(() => {
+    const map: Record<string, boolean> = {};
+    reservoirNames.forEach(res => {
+      map[res] = true;
+    });
+    return map;
+  });
+
+  const [showReservoirInPerfHeader, setShowReservoirInPerfHeader] = useState(false);
+  const [showCementPlugsTable, setShowCementPlugsTable] = useState(true);
 
   const handlePrint = () => {
     window.focus();
@@ -87,10 +101,27 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
     return minY;
   }, null);
 
+  const primaryShoeY: number | null = React.useMemo(() => {
+    const shoeTools = computedTools.filter(
+      (t) =>
+        t.effectiveType.toLowerCase().includes('shoe') ||
+        t.effectiveType.toLowerCase().includes('sabot') ||
+        (t.name || '').toLowerCase().includes('shoe') ||
+        (t.name || '').toLowerCase().includes('sabot')
+    );
+    if (shoeTools.length === 0) return null;
+    return shoeTools.reduce((min, t) => (t.visualYBottom < min ? t.visualYBottom : min), shoeTools[0].visualYBottom);
+  }, [computedTools]);
+
+  const maxTubingY: number | null = globalYTF !== null
+    ? (primaryShoeY !== null ? Math.min(globalYTF, primaryShoeY) : globalYTF)
+    : primaryShoeY;
+
   const completionBackbones = React.useMemo(() => {
     const isTubingLike = (t: string) => t === 'Tubing' || t === 'Tubing Court';
     const completion = computedTools
       .filter((t) => !isTubingLike(t.effectiveType))
+      .filter((t) => primaryShoeY === null || (t.visualYTop ?? 0) <= primaryShoeY)
       .sort((a, b) => (a.bottomDepth || 0) - (b.bottomDepth || 0));
     const ranges: { yStart: number; yEnd: number }[] = [];
     let groupStart = 0;
@@ -101,16 +132,16 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
       if (breakCluster) {
         const group = completion.slice(groupStart, i);
         if (group.length > 0) {
-          ranges.push({
-            yStart: Math.min(...group.map((t) => t.visualYTop ?? 0)),
-            yEnd: Math.max(...group.map((t) => t.visualYBottom ?? 0)),
-          });
+          const yStart = Math.min(...group.map((t) => t.visualYTop ?? 0));
+          const rawYEnd = Math.max(...group.map((t) => t.visualYBottom ?? 0));
+          const yEnd = primaryShoeY !== null ? Math.min(rawYEnd, primaryShoeY) : rawYEnd;
+          if (yStart < yEnd) ranges.push({ yStart, yEnd });
         }
         groupStart = i;
       }
     }
     return ranges;
-  }, [computedTools]);
+  }, [computedTools, primaryShoeY]);
 
   const renderPrintTubingColumn = (yStart: number, yEnd: number, key: string, tbgR: number) => {
     const segHeight = yEnd - yStart;
@@ -130,7 +161,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
   };
 
   // Calculate Cote Product for tubing table
-  const tubingsForTable = calculateCoteProducts(well.tubings, well.spoolProd);
+  const tubingsForTable = calculateCoteProducts(well.tubings || [], well.spoolProd);
 
   const topmostPerf = React.useMemo(() => {
     if (!well.perforations || well.perforations.length === 0) return null;
@@ -151,20 +182,20 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
     );
   };
 
-  const printCasingsData = layout.casings.map((cd) => {
-    const casing = well.casings[cd.casingIndex];
+  const printCasingsData = (layout?.casings || []).map((cd) => {
+    const casing = (well.casings || [])[cd.casingIndex];
     return { casing, i: cd.casingIndex, csgR: cd.casingR, holeR: cd.boreholeR, yTop: cd.yTop, yShoe: cd.yShoe, yDrilled: cd.yDrilled, yTOC: cd.yToc, hasCement: cd.hasCement, tocVal: cd.tocVal, hasLiner: cd.hasLiner, tolVal: cd.tolVal, yTOL: cd.yTol, hasTF: cd.hasTF, tfVal: cd.tfVal, yTF: cd.yTF };
   });
 
-  const sortedCasings = layout.sortedCasingIndices.map((i) => well.casings[i]);
-  const surfaceCsg = sortedCasings.find(c => (c.name || '').toLowerCase().includes('surface') || parseSizeToNumber(c.casingSize) > 9);
-  const prodCsg = sortedCasings.find(c => (c.name || '').toLowerCase().includes('production') || (parseSizeToNumber(c.casingSize) > 5 && parseSizeToNumber(c.casingSize) < 8));
+  const sortedCasings = (layout?.sortedCasingIndices || []).map((i) => (well.casings || [])[i]).filter(Boolean);
+  const surfaceCsg = sortedCasings.find(c => (c?.name || '').toLowerCase().includes('surface') || parseSizeToNumber(c?.casingSize) > 9);
+  const prodCsg = sortedCasings.find(c => (c?.name || '').toLowerCase().includes('production') || (parseSizeToNumber(c?.casingSize) > 5 && parseSizeToNumber(c?.casingSize) < 8));
 
   // Observations fallbacks
   const observationText = well.observations || '';
 
   // Find primary production tubing component dynamically
-  const primaryTbg = well.tubings.find(t => t.type === 'Tubing' && t.length > 100) || well.tubings.find(t => t.type === 'Tubing');
+  const primaryTbg = (well.tubings || []).find(t => t.type === 'Tubing' && t.length > 100) || (well.tubings || []).find(t => t.type === 'Tubing');
   const parsedTbgInfo = (() => {
     if (!primaryTbg) return null;
     
@@ -424,7 +455,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
     const allLabels: ResolutionLabel[] = [...csgLabelList, ...tbgLabelList, ...bracedCsgLabelList, ...toolLabels];
 
     // Add top hanger label if we have tubings
-    if (well.tubings.length > 0) {
+    if ((well.tubings || []).length > 0) {
       allLabels.push({
         id: 'blueprint-top-hanger',
         targetY: 55,
@@ -580,36 +611,79 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
             <div className="w-px h-8 bg-slate-200"></div>
 
             <div className="flex items-center gap-2">
-              {isEmbedded ? (
+              <button
+                id="btn_print_trigger"
+                onClick={handlePrint}
+                className="flex items-center gap-2 bg-orange-500 hover:bg-orange-600 px-4 py-2.5 rounded-xl text-white font-sans font-bold text-xs transition shadow-sm"
+                title="Imprimer le document A4"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Imprimer / Print</span>
+              </button>
+
+              {isEmbedded && (
                 <a
                   href={newTabUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 font-sans font-bold text-xs px-4 py-2.5 rounded-xl text-white transition shadow-sm ring-1 ring-slate-900/10"
+                  className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-sans font-bold text-xs px-3 py-2.5 rounded-xl transition border border-slate-200"
+                  title="Ouvrir dans un nouvel onglet"
                 >
-                  <ExternalLink className="w-4 h-4" />
-                  Open in New Tab
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Nouvel Onglet</span>
                 </a>
-              ) : (
-                <button
-                  id="btn_print_trigger"
-                  onClick={handlePrint}
-                  className="flex items-center justify-center bg-orange-500 hover:bg-orange-600 w-10 h-10 rounded-xl text-white transition shadow-sm"
-                  title="Print Document"
-                >
-                  <Printer className="w-4 h-4" />
-                </button>
               )}
+
               <button
                 id="btn_close_print"
                 onClick={onClose}
                 className="flex items-center justify-center bg-white border border-slate-200 hover:bg-orange-500 hover:border-orange-500 w-10 h-10 rounded-xl text-slate-400 hover:text-white transition shadow-sm ml-1"
-                title="Close"
+                title="Fermer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Options Affichage :</span>
+            <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={showCementPlugsTable}
+                onChange={(e) => setShowCementPlugsTable(e.target.checked)}
+                className="rounded text-orange-600 focus:ring-orange-500 w-3.5 h-3.5"
+              />
+              Bouchon(s) de Ciment (B.C)
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={showReservoirInPerfHeader}
+                onChange={(e) => setShowReservoirInPerfHeader(e.target.checked)}
+                className="rounded text-orange-600 focus:ring-orange-500 w-3.5 h-3.5"
+              />
+              Afficher "— RÉS. [Nom]" dans l'en-tête perfo
+            </label>
+          </div>
+          {reservoirNames.length > 1 && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="font-bold text-slate-600 uppercase tracking-wider text-[10px]">Réservoirs :</span>
+              {reservoirNames.map(res => (
+                <label key={res} className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedPerfRes[res] ?? true}
+                    onChange={(e) => setSelectedPerfRes(prev => ({ ...prev, [res]: e.target.checked }))}
+                    className="rounded text-orange-600 focus:ring-orange-500 w-3.5 h-3.5"
+                  />
+                  {res}
+                </label>
+              ))}
+            </div>
+          )}
         </div>
 
         {isEmbedded && (
@@ -861,62 +935,118 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                           </tr>
                         );
                       })}
+
+                      {/* B.C — Bouchon de Ciment rows */}
+                      {showCementPlugsTable && (well.cementPlugs || []).length > 0 && (
+                        <>
+                          <tr className="border-b border-black border-solid bg-gray-100">
+                            <td colSpan={8} className="px-2 py-0.5 font-sans font-black text-[9px] uppercase tracking-wider text-black">
+                              Bouchon(s) de Ciment (B.C)
+                            </td>
+                          </tr>
+                          {(well.cementPlugs || []).map((cp: CementPlug, idx: number) => (
+                            <tr key={cp.id || `bc-row-${idx}`} className="border-b border-black border-solid text-[10px] h-[22px] text-black">
+                              <td className="border-r border-black border-solid px-1 font-sans font-bold text-black">B.C</td>
+                              <td className="border-r border-black border-solid px-1 text-center text-black font-bold">01</td>
+                              <td className="border-r border-black border-solid px-1 text-center font-medium text-black">—</td>
+                              <td className="border-r border-black border-solid px-1 text-center font-bold text-black">—</td>
+                              <td className="border-r border-black border-solid px-1 text-right font-bold text-black">
+                                {formatDepth(cp.bottomDepth - cp.topDepth)}
+                              </td>
+                              <td className="border-r border-black border-solid px-1 text-right font-black text-black">
+                                {cp.topDepth}→{cp.bottomDepth}
+                              </td>
+                              <td className="border-r border-black border-solid px-1 text-center text-black">—</td>
+                              <td className="px-1 text-black text-[9.5px] font-medium">
+                                Top ciment: {cp.topDepth}m — B.C: {cp.bottomDepth}m{cp.observations ? ` | ${cp.observations}` : ''}
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              {/* TABLE B: PERFORATIONS */}
-              <div className="border border-black border-solid flex flex-col shrink-0 bg-white mb-2 print-color-adjust" id="print_perforations_table">
-                <div className="border-b border-black border-solid bg-gray-200 py-0.5 text-center font-sans font-black text-[10px] uppercase tracking-[0.2em] text-black">
-                  PERFORATIONS
-                </div>
-                <table className="w-full text-left font-mono text-[10px] border-collapse text-black">
-                  <thead>
-                    <tr className="border-b border-black border-solid text-[9px] font-bold uppercase bg-gray-200 text-black">
-                      <th className="border-r border-black px-1.5 py-0.5 text-center w-[120px]">NIVEAUX PERFORES</th>
-                      <th className="border-r border-black px-1 py-0.5 text-center w-[45px]">Hauteur</th>
-                      <th className="border-r border-black px-1 py-0.5 text-center w-[70px]">Type de Perfo.</th>
-                      <th className="border-r border-black px-1 py-0.5 text-center w-[80px]">Diamètre du Perfo.</th>
-                      <th className="border-r border-black px-1 py-0.5 text-center w-[70px]">Densité au m.</th>
-                      <th className="border-r border-black px-1 py-0.5 text-center w-[35px]">Calage</th>
-                      <th className="px-1.5 py-0.5 text-center w-[60px]">Nbr. de Cps. Tirés</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Display active perfs without padding */}
-                    {well.perforations.map((perf, idx) => {
-                      const isBlank = !perf;
 
-                      return (
-                        <tr key={isBlank ? `blank-perf-${idx}` : perf.id} className="border-b border-black border-solid h-[23px] text-[9.5px] text-black">
-                          <td className="border-r border-black border-solid px-1.5 font-bold text-center text-black">
-                            {isBlank ? '' : `De ${formatDepth(perf.topDepth)} à ${formatDepth(perf.bottomDepth)}`}
-                          </td>
-                          <td className="border-r border-black border-solid px-1 text-center font-bold text-black">
-                            {isBlank ? '' : `${perf.height % 1 === 0 ? perf.height : parseFloat(perf.height.toFixed(2))}m`}
-                          </td>
-                          <td className="border-r border-black border-solid px-1 text-center text-black uppercase">
-                            {isBlank ? '' : (perf.perfoType || '')}
-                          </td>
-                          <td className="border-r border-black border-solid px-1 text-center font-bold text-black">
-                            {isBlank ? '' : (perf.diameter || "")}
-                          </td>
-                          <td className="border-r border-black border-solid px-1 text-center text-black">
-                            {isBlank ? '' : (perf.density !== undefined ? perf.density : '')}
-                          </td>
-                          <td className="border-r border-black border-solid px-1 text-center text-black">
-                            {isBlank ? '' : (perf.calage || '')}
-                          </td>
-                          <td className="px-1.5 text-center font-bold text-black">
-                            {isBlank ? '' : (perf.shots !== undefined && perf.shots !== null ? (perf.shots % 1 === 0 ? perf.shots : parseFloat(perf.shots.toFixed(2))) : '')}
-                          </td>
+              {/* TABLE B: PERFORATIONS (Separated by Reservoir) */}
+              {(() => {
+                const perfs = well.perforations || [];
+                if (perfs.length === 0) {
+                  return (
+                    <div className="border border-black border-solid flex flex-col shrink-0 bg-white mb-2 print-color-adjust" id="print_perforations_table">
+                      <div className="border-b border-black border-solid bg-gray-200 py-0.5 text-center font-sans font-black text-[10px] uppercase tracking-[0.2em] text-black">
+                        PERFORATIONS
+                      </div>
+                      <div className="p-2 text-center text-[10px] text-gray-500 italic">Aucune perforation définie</div>
+                    </div>
+                  );
+                }
+
+                const groups = new Map<string, typeof perfs>();
+                perfs.forEach(p => {
+                  const res = p.reservoir || well.reservoir || 'Général';
+                  if (!groups.has(res)) {
+                    groups.set(res, []);
+                  }
+                  groups.get(res)!.push(p);
+                });
+
+                const visibleGroups = Array.from(groups.entries()).filter(([resName]) => selectedPerfRes[resName] ?? true);
+
+                if (visibleGroups.length === 0) {
+                  return null;
+                }
+
+                return visibleGroups.map(([resName, groupPerfs], gIdx) => (
+                  <div key={`print-perf-table-${gIdx}`} className="border border-black border-solid flex flex-col shrink-0 bg-white mb-2 print-color-adjust" id={`print_perforations_table_${gIdx}`}>
+                    <div className="border-b border-black border-solid bg-gray-200 py-0.5 text-center font-sans font-black text-[10px] uppercase tracking-[0.2em] text-black">
+                      PERFORATIONS {showReservoirInPerfHeader && resName ? `— RÉS. ${resName}` : ''}
+                    </div>
+                    <table className="w-full text-left font-mono text-[10px] border-collapse text-black">
+                      <thead>
+                        <tr className="border-b border-black border-solid text-[9px] font-bold uppercase bg-gray-200 text-black">
+                          <th className="border-r border-black px-1.5 py-0.5 text-center w-[120px]">NIVEAUX PERFORES</th>
+                          <th className="border-r border-black px-1 py-0.5 text-center w-[45px]">Hauteur</th>
+                          <th className="border-r border-black px-1 py-0.5 text-center w-[70px]">Type de Perfo.</th>
+                          <th className="border-r border-black px-1 py-0.5 text-center w-[80px]">Diamètre du Perfo.</th>
+                          <th className="border-r border-black px-1 py-0.5 text-center w-[70px]">Densité au m.</th>
+                          <th className="border-r border-black px-1 py-0.5 text-center w-[35px]">Calage</th>
+                          <th className="px-1.5 py-0.5 text-center w-[60px]">Nbr. de Cps. Tirés</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                      </thead>
+                      <tbody>
+                        {groupPerfs.map((perf, idx) => (
+                          <tr key={perf.id || idx} className="border-b border-black border-solid h-[23px] text-[9.5px] text-black">
+                            <td className="border-r border-black border-solid px-1.5 font-bold text-center text-black">
+                              {`De ${formatDepth(perf.topDepth)} à ${formatDepth(perf.bottomDepth)}`}
+                            </td>
+                            <td className="border-r border-black border-solid px-1 text-center font-bold text-black">
+                              {`${perf.height % 1 === 0 ? perf.height : parseFloat(perf.height.toFixed(2))}m`}
+                            </td>
+                            <td className="border-r border-black border-solid px-1 text-center text-black uppercase">
+                              {perf.perfoType || ''}
+                            </td>
+                            <td className="border-r border-black border-solid px-1 text-center font-bold text-black">
+                              {perf.diameter || ''}
+                            </td>
+                            <td className="border-r border-black border-solid px-1 text-center text-black">
+                              {perf.density !== undefined ? perf.density : ''}
+                            </td>
+                            <td className="border-r border-black border-solid px-1 text-center text-black">
+                              {perf.calage || ''}
+                            </td>
+                            <td className="px-1.5 text-center font-bold text-black">
+                              {perf.shots !== undefined && perf.shots !== null ? (perf.shots % 1 === 0 ? perf.shots : parseFloat(perf.shots.toFixed(2))) : ''}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ));
+              })()}
 
               {/* TABLE C: OBSERVATIONS FOOTNOTES */}
               <div className="border border-black p-1.5 shrink-0 bg-white" id="print_observations_box">
@@ -1334,7 +1464,8 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     return (
                       <g key="tubing-string-blueprint">
                         {tubingSegments.map((seg, sIdx) => {
-                          const effectiveYEnd = globalYTF !== null ? Math.min(seg.yEnd, globalYTF) : seg.yEnd;
+                          if (maxTubingY !== null && seg.yStart >= maxTubingY) return null;
+                          const effectiveYEnd = maxTubingY !== null ? Math.min(seg.yEnd, maxTubingY) : seg.yEnd;
                           const segHeight = effectiveYEnd - seg.yStart;
                           if (segHeight <= 0) return null;
                           return renderPrintTubingColumn(seg.yStart, effectiveYEnd, `tbg-seg-print-${sIdx}`, tbgR);
@@ -1342,7 +1473,8 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
 
                         {/* Tubing through completion clusters (mandrel, nipple, packer, shoe) */}
                         {completionBackbones.map((range, idx) => {
-                          const effectiveYEnd = globalYTF !== null ? Math.min(range.yEnd, globalYTF) : range.yEnd;
+                          if (maxTubingY !== null && range.yStart >= maxTubingY) return null;
+                          const effectiveYEnd = maxTubingY !== null ? Math.min(range.yEnd, maxTubingY) : range.yEnd;
                           const height = effectiveYEnd - range.yStart;
                           if (height <= 0) return null;
                           return renderPrintTubingColumn(range.yStart, effectiveYEnd, `completion-backbone-print-${idx}`, tbgR);
@@ -1376,7 +1508,43 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                       activeCsgR = sorted[0].csgR;
                     }
 
-                    // Render visual component dynamically from configuration matrix (Approach A)
+                    const isBridgePlug =
+                      effectiveType === 'Bridge Plug' ||
+                      effectiveType.toLowerCase().includes('bridge') ||
+                      effectiveType.toLowerCase().includes('bouchon') ||
+                      (tool.name || '').toLowerCase().includes('bridge') ||
+                      (tool.name || '').toLowerCase().includes('bouchon') ||
+                      (tool.type || '').toLowerCase().includes('bridge') ||
+                      (tool.type || '').toLowerCase().includes('bouchon');
+
+                    if (isBridgePlug) {
+                      const casingInnerWidth = activeCsgR * 2 + 2.5;
+                      const svgWidth = casingInnerWidth * (512 / 119.13);
+                      const svgX = xCenter - (253.68 / 512) * svgWidth;
+                      const plugDrawHeight = Math.max(50, height);
+                      return (
+                        <g key={`blueprint-img-${tool.id}`}>
+                          <svg
+                            x={svgX}
+                            y={yTop}
+                            width={svgWidth}
+                            height={plugDrawHeight}
+                            viewBox="0 0 512 512"
+                            preserveAspectRatio="none"
+                          >
+                            <image
+                              href="/img/bridge-plug.svg?v=10"
+                              x="0"
+                              y="0"
+                              width="512"
+                              height="512"
+                              preserveAspectRatio="none"
+                            />
+                          </svg>
+                        </g>
+                      );
+                    }
+
                     const config = resolveTubingConfig(effectiveType, tool.name);
 
                     if (config.renderType === 'image') {
@@ -1514,94 +1682,155 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                     );
                   })}
 
-                  {/* ACTIVE INFLOW PERFORATIONS — red conic jets matching interactive schematic */}
-                  {well.perforations.map((perf, pIdx) => {
-                    const yTop = mapDepthToY(perf.topDepth || 0);
-                    const yBottom = mapDepthToY(perf.bottomDepth || 0);
-                    const height = Math.max(0, yBottom - yTop);
-
-                    // Compute active casing radius at perforation mid-depth
-                    const perfMidDepth = ((perf.topDepth || 0) + (perf.bottomDepth || 0)) / 2;
-                    const coveringCasings = printCasingsData.filter(cd => {
-                      const top = cd.casing.topDepth || 0;
-                      const shoe = cd.casing.shoeDepth || 0;
-                      return perfMidDepth >= top && perfMidDepth <= shoe;
-                    });
-                    let perfCsgR = printCasingsData.length > 0
-                      ? Math.min(...printCasingsData.map(cd => cd.csgR))
-                      : 11;
-                    if (coveringCasings.length > 0) {
-                      coveringCasings.sort((a, b) => a.csgR - b.csgR);
-                      perfCsgR = coveringCasings[0].csgR;
-                    }
-                    const arrowOuter = perfCsgR + 16;
-                    const arrowTip   = arrowOuter + 4;
-
-                    // Recompute conic rows directly from yTop/yBottom (guaranteed alignment)
-                    const numConics = height > 0 ? Math.max(2, Math.round(height / 10)) : 1;
-                    const step = height > 0 ? height / numConics : 0;
-                    const perfRows: number[] = [];
-                    for (let k = 0; k < numConics; k++) {
-                      perfRows.push(yTop + step * k + step / 2);
-                    }
+                  {/* CEMENT PLUGS (B.C — Bouchon de Ciment) */}
+                  {(well.cementPlugs || []).map((cp: CementPlug, cpIdx: number) => {
+                    const yTop = mapDepthToY(cp.topDepth);
+                    const yBot = mapDepthToY(cp.bottomDepth);
+                    const plugHeight = Math.max(0, yBot - yTop);
+                    if (plugHeight <= 0) return null;
+                    const plugMidDepth = (cp.topDepth + cp.bottomDepth) / 2;
+                    const plugCasingR = activeCasingRadius(well, layout?.casings || [], plugMidDepth);
+                    const labelLineX = xCenter + plugCasingR + 4;
+                    const labelTextX = labelLineX + 16;
 
                     return (
-                      <g key={`blueprint-perf-${perf.id || pIdx}`}>
-                        {/* Perforation zone highlight */}
-                        <rect x={xCenter - arrowOuter} y={yTop} width={arrowOuter * 2} height={height || 2} fill="#dc2626" opacity="0.08" />
-
-                        {/* Conic jets — base at casing wall, tip pointing outward */}
-                        {perfRows.map((yVal, rIdx) => (
-                          <g key={`shot-${rIdx}`}>
-                            {/* Left conic */}
-                            <polygon
-                              points={`${xCenter - perfCsgR},${yVal - 4} ${xCenter - perfCsgR},${yVal + 4} ${xCenter - arrowTip},${yVal}`}
-                              fill="#dc2626"
-                              stroke="#991b1b"
-                              strokeWidth="0.5"
-                              strokeLinejoin="round"
-                            />
-                            {/* Right conic */}
-                            <polygon
-                              points={`${xCenter + perfCsgR},${yVal - 4} ${xCenter + perfCsgR},${yVal + 4} ${xCenter + arrowTip},${yVal}`}
-                              fill="#dc2626"
-                              stroke="#991b1b"
-                              strokeWidth="0.5"
-                              strokeLinejoin="round"
-                            />
-                          </g>
-                        ))}
-
-                        {/* Bracket and perforation depth label */}
-                        {(() => {
-                          const midY = (yTop + yBottom) / 2;
-                          // Use a fixed horizontal offset to align them cleanly
-                          const offsetH = 222;
-                          const textX = offsetH + 8;
-                          const resValue = perf.reservoir || well.reservoir;
-                          const textRes = resValue ? ` ${resValue}` : '';
-                          
-                          return (
-                            <g>
-                              {/* Bracket connecting top and bottom depth */}
-                              <path
-                                d={`M ${xCenter + arrowTip + 3} ${yTop} H ${offsetH} M ${xCenter + arrowTip + 3} ${yBottom} H ${offsetH} M ${offsetH} ${yTop} V ${yBottom} M ${offsetH} ${midY} H ${offsetH + 5}`}
-                                fill="none"
-                                stroke="#c41230"
-                                strokeWidth="1"
-                              />
-                              <text x={textX} y={midY - 2} textAnchor="start" fontSize="11" fontWeight="bold" fill="#c41230" className="font-mono tracking-tighter">
-                                PRF:
-                              </text>
-                              <text x={textX} y={midY + 10} textAnchor="start" fontSize="11" fontWeight="bold" fill="#c41230" className="font-mono tracking-tighter">
-                                {formatDepth(perf.topDepth)} - {formatDepth(perf.bottomDepth)}m{textRes}
-                              </text>
-                            </g>
-                          );
-                        })()}
+                      <g key={cp.id || `bc-print-${cpIdx}`}>
+                        {/* Cement fill */}
+                        <rect
+                          x={xCenter - plugCasingR}
+                          y={yTop}
+                          width={plugCasingR * 2}
+                          height={plugHeight}
+                          fill="url(#slurry-diagonal)"
+                          stroke="#94a3b8"
+                          strokeWidth="0.75"
+                          opacity="0.92"
+                        />
+                        {/* Top ciment label — above the line */}
+                        <line x1={labelLineX} y1={yTop} x2={labelLineX + 14} y2={yTop} stroke="#475569" strokeWidth="1" />
+                        <rect x={labelTextX - 2} y={yTop - 14} width={105} height={12} fill="white" opacity="0.9" rx="1.5" />
+                        <text
+                          x={labelTextX}
+                          y={yTop - 4}
+                          fontSize="10"
+                          fill="#0f172a"
+                          fontFamily="monospace"
+                          fontWeight="700"
+                        >
+                          Top ciment à {cp.topDepth}m
+                        </text>
+                        {/* B.C label — below the bottom line */}
+                        <line x1={labelLineX} y1={yBot} x2={labelLineX + 14} y2={yBot} stroke="#475569" strokeWidth="1" />
+                        <rect x={labelTextX - 2} y={yBot + 3} width={90} height={12} fill="white" opacity="0.9" rx="1.5" />
+                        <text
+                          x={labelTextX}
+                          y={yBot + 12}
+                          fontSize="10"
+                          fill="#0f172a"
+                          fontFamily="monospace"
+                          fontWeight="700"
+                        >
+                          B.C à {cp.bottomDepth}m
+                        </text>
                       </g>
                     );
                   })}
+
+                  {/* ACTIVE INFLOW PERFORATIONS — Grouped by Reservoir */}
+                  {well.perforations && well.perforations.length > 0 && (() => {
+                    const groupsMap = new Map<string, typeof well.perforations>();
+                    well.perforations.forEach(p => {
+                      const res = p.reservoir || well.reservoir || '';
+                      if (!groupsMap.has(res)) {
+                        groupsMap.set(res, []);
+                      }
+                      groupsMap.get(res)!.push(p);
+                    });
+
+                    return Array.from(groupsMap.entries()).map(([resName, groupPerfs], gIdx) => {
+                      const topD = Math.min(...groupPerfs.map(p => Math.min(p.topDepth || 0, p.bottomDepth || 0)));
+                      const bottomD = Math.max(...groupPerfs.map(p => Math.max(p.topDepth || 0, p.bottomDepth || 0)));
+                      const yTop = mapDepthToY(topD);
+                      const yBottom = mapDepthToY(bottomD);
+                      const height = Math.max(0, yBottom - yTop);
+                      const span = bottomD - topD;
+
+                      // Compute active casing radius at perforation mid-depth
+                      const perfMidDepth = (topD + bottomD) / 2;
+                      const coveringCasings = printCasingsData.filter(cd => {
+                        const top = cd.casing.topDepth || 0;
+                        const shoe = cd.casing.shoeDepth || 0;
+                        return perfMidDepth >= top && perfMidDepth <= shoe;
+                      });
+                      let perfCsgR = printCasingsData.length > 0
+                        ? Math.min(...printCasingsData.map(cd => cd.csgR))
+                        : 11;
+                      if (coveringCasings.length > 0) {
+                        coveringCasings.sort((a, b) => a.csgR - b.csgR);
+                        perfCsgR = coveringCasings[0].csgR;
+                      }
+                      const arrowOuter = perfCsgR + 16;
+                      const arrowTip   = arrowOuter + 4;
+
+                      // Use exactly 3 conics for clean schematic rendering
+                      const shotsCount = 3;
+                      const perfRows: number[] = [];
+                      for (let k = 0; k < shotsCount; k++) {
+                        const depth = topD + (span * (k + 0.5)) / shotsCount;
+                        perfRows.push(mapDepthToY(depth));
+                      }
+
+                      const textRes = resName ? ` ${resName}` : '';
+                      const midY = (yTop + yBottom) / 2;
+                      const offsetH = 222;
+                      const textX = offsetH + 8;
+
+                      return (
+                        <g key={`print-perf-group-${gIdx}`}>
+                          {/* Perforation zone highlight */}
+                          <rect x={xCenter - arrowOuter} y={yTop} width={arrowOuter * 2} height={height || 2} fill="#dc2626" opacity="0.08" />
+
+                          {/* Conic jets — base at casing wall, tip pointing outward */}
+                          {perfRows.map((yVal, rIdx) => (
+                            <g key={`shot-${rIdx}`}>
+                              {/* Left conic */}
+                              <polygon
+                                points={`${xCenter - perfCsgR},${yVal - 4} ${xCenter - perfCsgR},${yVal + 4} ${xCenter - arrowTip},${yVal}`}
+                                fill="#dc2626"
+                                stroke="#991b1b"
+                                strokeWidth="0.5"
+                                strokeLinejoin="round"
+                              />
+                              {/* Right conic */}
+                              <polygon
+                                points={`${xCenter + perfCsgR},${yVal - 4} ${xCenter + perfCsgR},${yVal + 4} ${xCenter + arrowTip},${yVal}`}
+                                fill="#dc2626"
+                                stroke="#991b1b"
+                                strokeWidth="0.5"
+                                strokeLinejoin="round"
+                              />
+                            </g>
+                          ))}
+
+                          {/* Bracket and perforation depth label */}
+                          <g>
+                            <path
+                              d={`M ${xCenter + arrowTip + 3} ${yTop} H ${offsetH} M ${xCenter + arrowTip + 3} ${yBottom} H ${offsetH} M ${offsetH} ${yTop} V ${yBottom} M ${offsetH} ${midY} H ${offsetH + 5}`}
+                              fill="none"
+                              stroke="#c41230"
+                              strokeWidth="1"
+                            />
+                            <text x={textX} y={midY - 2} textAnchor="start" fontSize="11" fontWeight="bold" fill="#c41230" className="font-mono tracking-tighter">
+                              PRF:
+                            </text>
+                            <text x={textX} y={midY + 10} textAnchor="start" fontSize="11" fontWeight="bold" fill="#c41230" className="font-mono tracking-tighter">
+                              {formatDepth(topD)} - {formatDepth(bottomD)}m{textRes}
+                            </text>
+                          </g>
+                        </g>
+                      );
+                    });
+                  })()}
 
                 </svg>
               </div>
@@ -1636,6 +1865,7 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                   /* ignore */
                 }
                 const nowStr = new Date().toLocaleString('fr-FR', {
+                  timeZone: 'Africa/Algiers',
                   day: '2-digit',
                   month: '2-digit',
                   year: 'numeric',

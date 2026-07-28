@@ -93,11 +93,24 @@ pub struct WellData {
     pub tubings: Vec<TubingComponent>,
     #[serde(default)]
     pub perforations: Vec<PerforationZone>,
+    #[serde(default)]
+    pub cement_plugs: Vec<CementPlug>,
     pub observations: Option<String>,
     pub folio: Option<String>,
     pub folio_to_cancel: Option<String>,
     #[serde(default)]
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CementPlug {
+    pub id: String,
+    #[serde(default)]
+    pub top_depth: f64,
+    #[serde(default)]
+    pub bottom_depth: f64,
+    pub observations: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
