@@ -887,11 +887,11 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 onClick={() => { setShowBPForm(v => !v); setShowBCForm(false); }}
                 className={`h-9 px-4 font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-sm flex items-center gap-2 border ${
                   showBPForm
-                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    ? 'bg-slate-200 text-slate-700 border-slate-300'
                     : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                <span className="text-[10px] font-bold bg-amber-600 text-white rounded px-1 py-0.5">BP</span>
+                <span className="text-[10px] font-bold bg-slate-600 text-white rounded px-1 py-0.5">BP</span>
                 Add B.P
               </button>
 
@@ -921,9 +921,8 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
 
         {/* B.P — BRIDGE PLUG (hidden until Add B.P clicked) */}
         {showBPForm && (
-          <div className="border-t border-slate-200 pt-4 space-y-3 bg-amber-50/30 p-4 rounded-xl border border-amber-200">
-            <h5 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span className="bg-amber-600 text-white rounded px-1 py-0.5 text-[9px]">BP</span>
+          <div className="border-t border-slate-200 pt-4 space-y-3">
+            <h5 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               {editingBPId ? 'Modifier Bridge Plug (B.P)' : 'Bridge Plug (B.P)'}
             </h5>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
@@ -931,7 +930,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
               <div>
                 <label className="block text-[11px] font-medium text-slate-700 mb-1">Désignation</label>
                 <select
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-medium text-slate-800"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-medium text-slate-800"
                   value={newBP.designation || 'Bridge plug'}
                   onChange={e => setNewBP(prev => ({ ...prev, designation: e.target.value }))}
                 >
@@ -948,7 +947,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 <input
                   type="text"
                   placeholder='ex: 7"'
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-slate-800"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono text-slate-800"
                   value={newBP.size || ''}
                   onChange={e => setNewBP(prev => ({ ...prev, size: e.target.value }))}
                 />
@@ -958,7 +957,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
               <div>
                 <label className="block text-[11px] font-medium text-slate-700 mb-1">Type</label>
                 <select
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-bold text-amber-900"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-semibold text-slate-800"
                   value={newBP.type || 'PERMANENT'}
                   onChange={e => setNewBP(prev => ({ ...prev, type: e.target.value }))}
                 >
@@ -974,7 +973,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                   type="number"
                   step="0.01"
                   placeholder="ex: 0.23"
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-slate-800"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono text-slate-800"
                   value={newBP.length ?? ''}
                   onChange={e => setNewBP(prev => ({ ...prev, length: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
                 />
@@ -987,7 +986,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                   type="number"
                   step="0.01"
                   placeholder="ex: 714"
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-emerald-800 font-bold"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white font-mono text-emerald-800 font-bold"
                   value={newBP.bottomDepth ?? ''}
                   onChange={e => setNewBP(prev => ({ ...prev, bottomDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
                 />
@@ -999,7 +998,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 <input
                   type="text"
                   placeholder="Notes..."
-                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white text-slate-800"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-slate-400 focus:ring-0 outline-none bg-white text-slate-800"
                   value={newBP.observations || ''}
                   onChange={e => setNewBP(prev => ({ ...prev, observations: e.target.value }))}
                 />
@@ -1014,7 +1013,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                     setEditingBPId(null);
                     setNewBP({ designation: 'Bridge plug', size: '7"', type: 'PERMANENT', length: 0.23, bottomDepth: undefined, observations: '' });
                   }}
-                  className="h-8 px-3 text-xs text-slate-600 hover:text-slate-800"
+                  className="h-9 px-3 text-xs text-slate-600 hover:text-slate-800"
                 >
                   Annuler
                 </button>
@@ -1022,12 +1021,63 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
               <button
                 type="button"
                 onClick={() => handleSaveBP()}
-                className="h-8 px-5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-md flex items-center gap-1.5"
+                className="h-9 px-6 bg-slate-800 hover:bg-slate-900 text-white font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-md hover:shadow-lg flex items-center gap-2"
               >
                 <Check className="w-4 h-4" />
-                {editingBPId ? 'Enregistrer Modif B.P' : 'Save B.P'}
+                {editingBPId ? 'Save Changes' : 'Save B.P'}
               </button>
             </div>
+
+            {/* Existing Bridge Plugs (B.P) list — shown when Add B.P is open */}
+            {(well.tubings || []).filter(t => isBridgePlugItem(t)).length > 0 && (
+              <div className="space-y-1 pt-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bridge Plug(s) (B.P) Enregistré(s)</p>
+                {(well.tubings || []).filter(t => isBridgePlugItem(t)).map(bp => (
+                  <div key={bp.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                    <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-700">
+                      <span className="font-bold text-slate-900 bg-slate-200 rounded px-1.5 py-0.5 text-[10px]">{bp.name}</span>
+                      <span>Taille: <strong>{bp.od || '7"'}</strong></span>
+                      <span className="font-bold text-slate-800">Type: {bp.customType || 'PERMANENT'}</span>
+                      {bp.length ? <span>L: <strong>{bp.length}m</strong></span> : null}
+                      <span className="text-emerald-800 font-bold">Cote Product: {bp.bottomDepth}m</span>
+                      {bp.observations ? <span className="text-slate-500 ml-1">({bp.observations})</span> : null}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {canAddOrEdit && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingBPId(bp.id);
+                            setNewBP({
+                              designation: bp.name || 'Bridge plug',
+                              size: bp.od || '7"',
+                              type: bp.customType || 'PERMANENT',
+                              length: bp.length || 0,
+                              bottomDepth: bp.bottomDepth,
+                              observations: bp.observations || ''
+                            });
+                          }}
+                          className="p-1 text-sky-500 hover:text-sky-600 hover:bg-sky-50 rounded transition"
+                          title="Modifier"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => removeTubing(bp.id)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
