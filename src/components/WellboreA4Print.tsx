@@ -1020,25 +1020,24 @@ export default function WellboreA4Print({ well: wellProp, onClose, hideSchematic
                               })
                               .map((bp: TubingComponent, idx: number) => {
                                 const rowMeta = layout.printTableRows.find((r) => r.toolId === bp.id);
-                                const displayOd = rowMeta?.displayOd ?? (bp.od || '7"');
-                                const displayType = rowMeta?.displayType ?? (bp.customType || bp.type || 'PERMANENT');
                                 const qty = rowMeta?.qty ?? (bp.qty || '01');
+                                const displayOd = bp.od ? `Taille: ${bp.od}` : '';
+                                const displayType = bp.customType || bp.type ? `Type: ${bp.customType || bp.type}` : '';
+                                const obsList = [bp.name || 'Bridge plug', displayOd, displayType, bp.observations].filter(Boolean).join(' | ');
 
                                 return (
                                   <tr key={bp.id || `bp-row-${idx}`} className="border-b border-black border-solid text-[10px] h-[22px] text-black">
-                                    <td className="border-r border-black border-solid px-1 font-sans font-bold text-black">{bp.name || 'Bridge plug'}</td>
+                                    <td className="border-r border-black border-solid px-1 font-sans font-bold text-black">B.P</td>
                                     <td className="border-r border-black border-solid px-1 text-center text-black font-bold">{qty}</td>
-                                    <td className="border-r border-black border-solid px-1 text-center font-bold text-black">{displayType}</td>
-                                    <td className="border-r border-black border-solid px-1 text-center font-bold text-black">{displayOd}</td>
-                                    <td className="border-r border-black border-solid px-1 text-right font-bold text-black">
-                                      {bp.length ? formatDepth(bp.length) : '0.00'}
-                                    </td>
+                                    <td className="border-r border-black border-solid px-1 text-center font-medium text-black">—</td>
+                                    <td className="border-r border-black border-solid px-1 text-center font-medium text-black">—</td>
+                                    <td className="border-r border-black border-solid px-1 text-center font-medium text-black">—</td>
                                     <td className="border-r border-black border-solid px-1 text-right font-black text-black">
-                                      {formatDepth(bp.bottomDepth)}
+                                      {formatDepth(bp.bottomDepth)}m
                                     </td>
-                                    <td className="border-r border-black border-solid px-1 text-center text-black">{bp.minId || '—'}</td>
+                                    <td className="border-r border-black border-solid px-1 text-center text-black">—</td>
                                     <td className="px-1 text-black text-[9.5px] font-medium">
-                                      {bp.observations || ''}
+                                      {obsList}
                                     </td>
                                   </tr>
                                 );
