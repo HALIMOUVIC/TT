@@ -953,7 +953,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 />
               </div>
 
-              {/* Type: PERMANENT - RECUPERABLE */}
+              {/* Type: PERMANENT - RECUPERABLE - EU - NU - CTC */}
               <div>
                 <label className="block text-[11px] font-medium text-slate-700 mb-1">Type</label>
                 <select
@@ -963,6 +963,9 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 >
                   <option value="PERMANENT">PERMANENT</option>
                   <option value="RÉCUPÉRABLE">RÉCUPÉRABLE</option>
+                  <option value="EU">EU</option>
+                  <option value="NU">NU</option>
+                  <option value="CTC">CTC</option>
                 </select>
               </div>
 
@@ -1037,7 +1040,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                     <div className="flex flex-wrap items-center gap-3 text-xs font-mono text-slate-700">
                       <span className="font-bold text-slate-900 bg-slate-200 rounded px-1.5 py-0.5 text-[10px]">{bp.name}</span>
                       <span>Taille: <strong>{bp.od || '7"'}</strong></span>
-                      <span className="font-bold text-slate-800">Type: {bp.customType || 'PERMANENT'}</span>
+                      <span className="font-bold text-slate-800">Type: {bp.customType || bp.type || 'PERMANENT'}</span>
                       {bp.length ? <span>L: <strong>{bp.length}m</strong></span> : null}
                       <span className="text-emerald-800 font-bold">Cote Product: {bp.bottomDepth}m</span>
                       {bp.observations ? <span className="text-slate-500 ml-1">({bp.observations})</span> : null}
@@ -1051,7 +1054,7 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                             setNewBP({
                               designation: bp.name || 'Bridge plug',
                               size: bp.od || '7"',
-                              type: bp.customType || 'PERMANENT',
+                              type: bp.customType || bp.type || 'PERMANENT',
                               length: bp.length || 0,
                               bottomDepth: bp.bottomDepth,
                               observations: bp.observations || ''
