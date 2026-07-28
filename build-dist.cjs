@@ -28,6 +28,12 @@ async function main() {
     if (fs.existsSync(path.join(__dirname, '.env.local'))) {
       fs.copyFileSync(path.join(__dirname, '.env.local'), path.join(stagingDir, '.env.local'));
     }
+    if (fs.existsSync(path.join(__dirname, 'LICENSE.txt'))) {
+      fs.copyFileSync(path.join(__dirname, 'LICENSE.txt'), path.join(stagingDir, 'LICENSE.txt'));
+    }
+    if (fs.existsSync(path.join(__dirname, 'installer.nsh'))) {
+      fs.copyFileSync(path.join(__dirname, 'installer.nsh'), path.join(stagingDir, 'installer.nsh'));
+    }
 
     const rootPkg = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8'));
     const appVersion = rootPkg.version || '1.0.1';
@@ -121,6 +127,8 @@ async function main() {
       nsis: {
         oneClick: false,
         allowToChangeInstallationDirectory: true,
+        license: 'LICENSE.txt',
+        include: 'installer.nsh',
         createDesktopShortcut: true,
         createStartMenuShortcut: true,
         shortcutName: 'Wellbore Schematic Pro',

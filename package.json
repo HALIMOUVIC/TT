@@ -43,13 +43,15 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "license": "LICENSE.txt",
+      "include": "installer.nsh",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Wellbore Schematic Pro",
       "installerIcon": "wellborePro.ico",
       "uninstallerIcon": "wellborePro.ico",
       "uninstallDisplayName": "Wellbore Schematic Pro",
-      "artifactName": "WellboreSchematicPro Setup.${ext}"
+      "artifactName": "WellboreSchematicPro Setup v1.0.1.${ext}"
     }
   },
   "dependencies": {
