@@ -139,7 +139,15 @@ export default function WellDashboard({ wells, activeWellId, onSelectWell, onNav
       && (filterP === "ALL" || p === filterP);
   });
 
-  const abandonedCount = wells.filter(w => w.isAbandonProvisoire || (w.completionType || "").toLowerCase().includes("abandon")).length;
+  const isWellAbandoned = (w: WellData) => Boolean(
+    w.isAbandonProvisoire || 
+    (w.completionType || "").toLowerCase().includes("abandon")
+  );
+
+  const abandonedCount = wells.filter(isWellAbandoned).length;
+  const activeWells = wells.filter(w => !isWellAbandoned(w));
+  const activeWellsCount = activeWells.length;
+  const activeReservoirsCount = new Set(activeWells.map(w => w.reservoir).filter(r => r && r !== "N/A" && r !== "—")).size;
 
   /* KPI cards — imgSrc points to actual files in /public/img/
      The BUILD_TS query param busts the browser cache on every
@@ -164,9 +172,9 @@ export default function WellDashboard({ wells, activeWellId, onSelectWell, onNav
       border: "#bfdbfe",
     },
     {
-      label: "Réservoirs Actifs",
-      value: String(Object.keys(resCnt).length),
-      sub: "formations productrices",
+      label: "Puits Actifs",
+      value: String(activeWellsCount),
+      sub: activeReservoirsCount > 0 ? `${activeReservoirsCount} formation${activeReservoirsCount > 1 ? "s" : ""} productrice${activeReservoirsCount > 1 ? "s" : ""}` : "puits en exploitation",
       imgSrc: `/img/reservoirs_actifs.svg?t=${BUILD_TS}`,
       accent: "#8b5cf6",
       bg: "#faf5ff",
