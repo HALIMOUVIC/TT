@@ -377,6 +377,21 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
     }
   };
 
+  // Helper for identifying Bridge Plug items
+  const isBridgePlugItem = (t: TubingComponent) => {
+    const nameLower = (t.name || '').toLowerCase();
+    const typeLower = (t.type || '').toLowerCase();
+    const customTypeLower = (t.customType || '').toLowerCase();
+    return (
+      typeLower === 'bridge plug' ||
+      typeLower.includes('bridge') ||
+      customTypeLower.includes('bridge') ||
+      nameLower.includes('bridge') ||
+      nameLower.includes('b.p') ||
+      nameLower.includes('bp')
+    );
+  };
+
   // ==================== CEMENT PLUG (B.C) ====================
   const [newCementPlug, setNewCementPlug] = useState<Partial<CementPlug>>({
     topDepth: undefined,
@@ -384,6 +399,83 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
     observations: ''
   });
   const [showBCForm, setShowBCForm] = useState(false);
+
+  // ==================== BRIDGE PLUG (B.P) ====================
+  const [showBPForm, setShowBPForm] = useState(false);
+  const [editingBPId, setEditingBPId] = useState<string | null>(null);
+  const [newBP, setNewBP] = useState<{
+    designation: string;
+    size: string;
+    type: string;
+    length?: number;
+    bottomDepth?: number;
+    observations: string;
+  }>({
+    designation: 'Bridge plug',
+    size: '7"',
+    type: 'PERMANENT',
+    length: 0.23,
+    bottomDepth: undefined,
+    observations: ''
+  });
+
+  const handleSaveBP = () => {
+    const depth = newBP.bottomDepth;
+    if (depth === undefined || isNaN(depth)) return;
+    const len = newBP.length !== undefined ? parseFloat(String(newBP.length)) : 0;
+
+    let updatedTubings = [...(well.tubings || [])];
+
+    if (editingBPId) {
+      updatedTubings = updatedTubings.map(t => {
+        if (t.id === editingBPId) {
+          return {
+            ...t,
+            name: newBP.designation || 'Bridge plug',
+            type: 'Bridge Plug' as TubingComponentType,
+            customType: newBP.type || 'PERMANENT',
+            od: newBP.size || '7"',
+            length: len,
+            bottomDepth: depth,
+            isCoteProductAdded: true,
+            observations: newBP.observations || ''
+          };
+        }
+        return t;
+      });
+      setEditingBPId(null);
+    } else {
+      const entry: TubingComponent = {
+        id: `bp-${Date.now()}`,
+        name: newBP.designation || 'Bridge plug',
+        type: 'Bridge Plug' as TubingComponentType,
+        qty: '01',
+        customType: newBP.type || 'PERMANENT',
+        od: newBP.size || '7"',
+        length: len,
+        bottomDepth: depth,
+        isCoteProductAdded: true,
+        observations: newBP.observations || ''
+      };
+      updatedTubings.push(entry);
+    }
+
+    onChange({
+      ...well,
+      tubings: updatedTubings,
+      updatedAt: new Date().toISOString()
+    });
+
+    setShowBPForm(false);
+    setNewBP({
+      designation: 'Bridge plug',
+      size: '7"',
+      type: 'PERMANENT',
+      length: 0.23,
+      bottomDepth: undefined,
+      observations: ''
+    });
+  };
 
   const handleSaveCementPlug = () => {
     const top = newCementPlug.topDepth;
@@ -786,21 +878,36 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
           </div>
         </div>
 
-        {/* ONE SAVE BUTTON + ADD B.C BUTTON */}
+        {/* ONE SAVE BUTTON + ADD B.C BUTTON + ADD B.P BUTTON */}
         <div className="flex justify-end gap-2 pt-2">
           {canAddOrEdit && (
-            <button
-              type="button"
-              onClick={() => setShowBCForm(v => !v)}
-              className={`h-9 px-4 font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-sm flex items-center gap-2 border ${
-                showBCForm
-                  ? 'bg-slate-200 text-slate-700 border-slate-300'
-                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              <span className="text-[10px] font-bold bg-slate-600 text-white rounded px-1 py-0.5">BC</span>
-              Add B.C
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => { setShowBPForm(v => !v); setShowBCForm(false); }}
+                className={`h-9 px-4 font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-sm flex items-center gap-2 border ${
+                  showBPForm
+                    ? 'bg-amber-100 text-amber-800 border-amber-300'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-[10px] font-bold bg-amber-600 text-white rounded px-1 py-0.5">BP</span>
+                Add B.P
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setShowBCForm(v => !v); setShowBPForm(false); }}
+                className={`h-9 px-4 font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-sm flex items-center gap-2 border ${
+                  showBCForm
+                    ? 'bg-slate-200 text-slate-700 border-slate-300'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <span className="text-[10px] font-bold bg-slate-600 text-white rounded px-1 py-0.5">BC</span>
+                Add B.C
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -811,6 +918,118 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
             {editingTubingId ? 'Save Changes' : 'Add Component'}
           </button>
         </div>
+
+        {/* B.P — BRIDGE PLUG (hidden until Add B.P clicked) */}
+        {showBPForm && (
+          <div className="border-t border-slate-200 pt-4 space-y-3 bg-amber-50/30 p-4 rounded-xl border border-amber-200">
+            <h5 className="text-[10px] font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="bg-amber-600 text-white rounded px-1 py-0.5 text-[9px]">BP</span>
+              {editingBPId ? 'Modifier Bridge Plug (B.P)' : 'Bridge Plug (B.P)'}
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+              {/* Désignation — dropdown from Designations & Composants */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Désignation</label>
+                <select
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-medium text-slate-800"
+                  value={newBP.designation || 'Bridge plug'}
+                  onChange={e => setNewBP(prev => ({ ...prev, designation: e.target.value }))}
+                >
+                  <option value="Bridge plug">Bridge plug</option>
+                  {componentTypes.map(ct => (
+                    <option key={ct.value} value={ct.label}>{ct.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Taille / Size like 7" */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Taille (Size)</label>
+                <input
+                  type="text"
+                  placeholder='ex: 7"'
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-slate-800"
+                  value={newBP.size || ''}
+                  onChange={e => setNewBP(prev => ({ ...prev, size: e.target.value }))}
+                />
+              </div>
+
+              {/* Type: PERMANENT - RECUPERABLE */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Type</label>
+                <select
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-bold text-amber-900"
+                  value={newBP.type || 'PERMANENT'}
+                  onChange={e => setNewBP(prev => ({ ...prev, type: e.target.value }))}
+                >
+                  <option value="PERMANENT">PERMANENT</option>
+                  <option value="RÉCUPÉRABLE">RÉCUPÉRABLE</option>
+                </select>
+              </div>
+
+              {/* Longueur (m) */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Longueur (m)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="ex: 0.23"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-slate-800"
+                  value={newBP.length ?? ''}
+                  onChange={e => setNewBP(prev => ({ ...prev, length: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                />
+              </div>
+
+              {/* Cote Product (m) */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Cote Product (m)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="ex: 714"
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white font-mono text-emerald-800 font-bold"
+                  value={newBP.bottomDepth ?? ''}
+                  onChange={e => setNewBP(prev => ({ ...prev, bottomDepth: e.target.value === '' ? undefined : parseFloat(e.target.value) }))}
+                />
+              </div>
+
+              {/* Observations */}
+              <div>
+                <label className="block text-[11px] font-medium text-slate-700 mb-1">Observations</label>
+                <input
+                  type="text"
+                  placeholder="Notes..."
+                  className="w-full h-8 px-2 text-xs border border-slate-200 rounded focus:border-amber-500 focus:ring-0 outline-none bg-white text-slate-800"
+                  value={newBP.observations || ''}
+                  onChange={e => setNewBP(prev => ({ ...prev, observations: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              {editingBPId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingBPId(null);
+                    setNewBP({ designation: 'Bridge plug', size: '7"', type: 'PERMANENT', length: 0.23, bottomDepth: undefined, observations: '' });
+                  }}
+                  className="h-8 px-3 text-xs text-slate-600 hover:text-slate-800"
+                >
+                  Annuler
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleSaveBP()}
+                className="h-8 px-5 bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs uppercase tracking-wider rounded-lg transition shadow-md flex items-center gap-1.5"
+              >
+                <Check className="w-4 h-4" />
+                {editingBPId ? 'Enregistrer Modif B.P' : 'Save B.P'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* B.C — BOUCHON DE CIMENT (hidden until Add B.C clicked) */}
         {showBCForm && (
@@ -880,6 +1099,57 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Existing Bridge Plugs (B.P) list when form is closed */}
+        {(well.tubings || []).filter(t => isBridgePlugItem(t)).length > 0 && (
+          <div className="border-t border-slate-200 pt-3 space-y-1.5">
+            <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="bg-amber-600 text-white rounded px-1 py-0.5 text-[9px]">BP</span>
+              Bridge Plug(s) (B.P) Enregistré(s)
+            </p>
+            {(well.tubings || []).filter(t => isBridgePlugItem(t)).map(bp => (
+              <div key={bp.id} className="flex items-center justify-between bg-amber-50/70 border border-amber-200 rounded-lg px-3 py-2">
+                <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+                  <span className="font-bold text-amber-900 bg-amber-200/80 rounded px-1.5 py-0.5 text-[10px]">{bp.name}</span>
+                  <span className="text-slate-700">Taille: <strong>{bp.od || '7"'}</strong></span>
+                  <span className="text-amber-800 font-bold">Type: {bp.customType || 'PERMANENT'}</span>
+                  {bp.length ? <span className="text-slate-700">L: <strong>{bp.length}m</strong></span> : null}
+                  <span className="text-emerald-800 font-bold">Cote Product: {bp.bottomDepth}m</span>
+                  {bp.observations ? <span className="text-slate-500 ml-1">({bp.observations})</span> : null}
+                </div>
+                <div className="flex items-center gap-2">
+                  {canAddOrEdit && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBPForm(true);
+                        setShowBCForm(false);
+                        setEditingBPId(bp.id);
+                        setNewBP({
+                          designation: bp.name || 'Bridge plug',
+                          size: bp.od || '7"',
+                          type: bp.customType || 'PERMANENT',
+                          length: bp.length || 0,
+                          bottomDepth: bp.bottomDepth,
+                          observations: bp.observations || ''
+                        });
+                      }}
+                      className="text-sky-600 hover:text-sky-800 p-1"
+                      title="Modifier"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button type="button" onClick={() => removeTubing(bp.id)} className="text-red-400 hover:text-red-600 p-1" title="Supprimer">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -968,29 +1238,36 @@ export default function WellboreForm({ well, onChange, canAddOrEdit = true, canD
                     <th className="px-3 py-2.5 text-right w-20">Actions</th>
                   </tr>
                 </thead>
-                <SortableContext items={(well.tubings || []).map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <SortableContext items={(well.tubings || []).filter(t => !isBridgePlugItem(t)).map(t => t.id)} strategy={verticalListSortingStrategy}>
                   <tbody className="divide-y divide-slate-100">
-                    {calculateCoteProducts(well.tubings || [], well.spoolProd).map((t) => {
-                      return (
-                        <SortableTubingRow 
-                          key={t.id} 
-                          t={t} 
-                          cote={t.calculatedCote}
-                          canAddOrEdit={canAddOrEdit}
-                          canDelete={canDelete}
-                          onEdit={() => {
-                              setFormMode('tubing');
-                              setEditingTubingId(t.id);
-                              setNewTubing(t);
-                              document.getElementById('wellbore_form_root')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          onDelete={() => removeTubing(t.id)}
-                        />
-                      );
-                    })}
+                    {calculateCoteProducts(well.tubings || [], well.spoolProd)
+                      .filter(t => !isBridgePlugItem(t))
+                      .map((t) => {
+                        return (
+                          <SortableTubingRow 
+                            key={t.id} 
+                            t={t} 
+                            cote={t.calculatedCote}
+                            canAddOrEdit={canAddOrEdit}
+                            canDelete={canDelete}
+                            onEdit={() => {
+                                setFormMode('tubing');
+                                setEditingTubingId(t.id);
+                                setNewTubing(t);
+                                document.getElementById('wellbore_form_root')?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            onDelete={() => removeTubing(t.id)}
+                          />
+                        );
+                      })}
                     <tr className="bg-slate-100 font-bold border-t border-slate-200">
                       <td className="px-3 py-2.5" colSpan={5}></td>
-                      <td className="px-2 py-2.5 text-right font-mono text-slate-800">{(well.tubings || []).reduce((sum, t) => sum + (t.length || 0), 0).toFixed(2)}</td>
+                      <td className="px-2 py-2.5 text-right font-mono text-slate-800">
+                        {(well.tubings || [])
+                          .filter(t => !isBridgePlugItem(t))
+                          .reduce((sum, t) => sum + (t.length || 0), 0)
+                          .toFixed(2)}
+                      </td>
                       <td colSpan={4}></td>
                     </tr>
                   </tbody>
