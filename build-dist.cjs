@@ -54,6 +54,12 @@ async function main() {
     }
     fs.mkdirSync(stagingDir);
 
+    // Clean up win-unpacked to prevent EPERM locks during electron-builder extraction
+    const winUnpackedDir = path.join(__dirname, 'build-desktop', 'win-unpacked');
+    if (fs.existsSync(winUnpackedDir)) {
+      try { fs.rmSync(winUnpackedDir, { recursive: true, force: true }); } catch (_) {}
+    }
+
     // 3. Copy only compiled production assets
     console.log('Staging compiled files...');
     fs.cpSync(path.join(__dirname, 'dist'), path.join(stagingDir, 'dist'), { recursive: true });
@@ -153,7 +159,7 @@ async function main() {
       electronVersion: '33.4.4',
       directories: {
         app: '.',
-        output: path.join(__dirname, 'build-desktop')
+        output: path.join(stagingDir, 'dist-out')
       },
       files: [
         'dist/**/*',
@@ -172,6 +178,13 @@ async function main() {
         'base.db'
       ],
       asar: true,
+      publish: [
+        {
+          provider: 'github',
+          owner: 'HALIMOUVIC',
+          repo: 'TT'
+        }
+      ],
       win: {
         icon: 'wellborePro.ico',
         executableName: 'WellboreSchematicPro',
@@ -202,12 +215,44 @@ async function main() {
     console.log('Building NSIS installer with electron-builder inside staging directory...');
     runCommand(`npx electron-builder --config electron-builder.json --win nsis`, stagingDir);
 
-    // 9. Cleanup
+    // 9. Copy all built artifacts from staging dist-out -> build-desktop
+    const finalDestDir = path.join(__dirname, 'build-desktop');
+    if (!fs.existsSync(finalDestDir)) {
+      fs.mkdirSync(finalDestDir, { recursive: true });
+    }
+    const distOutDir = path.join(stagingDir, 'dist-out');
+    if (fs.existsSync(distOutDir)) {
+      const outFiles = fs.readdirSync(distOutDir);
+      for (const file of outFiles) {
+        if (file !== 'win-unpacked' && file !== 'builder-debug.yml') {
+          fs.copyFileSync(path.join(distOutDir, file), path.join(finalDestDir, file));
+          console.log(`  Output copied: ${file}`);
+        }
+      }
+    }
+
+    // 10. Compute and verify latest.yml for auto-updater
+    const crypto = require('crypto');
+    const exeName = `WellboreSchematicPro Setup v${appVersion}.exe`;
+    const exePath = path.join(finalDestDir, exeName);
+    if (fs.existsSync(exePath)) {
+      const fileBuffer = fs.readFileSync(exePath);
+      const sha512Base64 = crypto.createHash('sha512').update(fileBuffer).digest('base64');
+      const latestYmlContent = `version: ${appVersion}\nfiles:\n  - url: ${exeName}\n    sha512: ${sha512Base64}\n    size: ${fileBuffer.length}\npath: ${exeName}\nsha512: ${sha512Base64}\nreleaseDate: '${new Date().toISOString()}'\n`;
+      fs.writeFileSync(path.join(finalDestDir, 'latest.yml'), latestYmlContent);
+      console.log(`\n✅ Generated latest.yml (version v${appVersion}, size: ${fileBuffer.length} bytes, sha512: ${sha512Base64.substring(0, 16)}...)`);
+    }
+
+    // 11. Cleanup
     console.log('Cleaning up temporary staging folder...');
     fs.rmSync(stagingDir, { recursive: true, force: true });
 
     console.log('\n==================================================');
-    console.log('SUCCESS: Installer generated inside "build-desktop/"!');
+    console.log(`SUCCESS: Version v${appVersion} generated in "build-desktop/"!`);
+    console.log('Files created:');
+    console.log(`  - ${exeName}`);
+    console.log(`  - ${exeName}.blockmap`);
+    console.log(`  - latest.yml`);
     console.log('==================================================');
   } catch (error) {
     console.error('\nBuild failed:', error.message);
