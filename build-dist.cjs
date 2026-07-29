@@ -1,6 +1,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 function runCommand(cmd, cwd) {
   console.log(`\nExecuting: ${cmd} (in ${cwd || __dirname})`);
@@ -45,8 +46,8 @@ async function main() {
     // 1. Build the production React frontend and Express server
     runCommand('npm run build');
 
-    // 2. Setup clean staging directory
-    const stagingDir = path.join(__dirname, 'package-staging');
+    // 2. Setup clean staging directory in system temp to isolate native rebuild
+    const stagingDir = path.join(os.tmpdir(), 'wellbore-staging');
     if (fs.existsSync(stagingDir)) {
       console.log('Cleaning up existing staging directory...');
       fs.rmSync(stagingDir, { recursive: true, force: true });
@@ -120,10 +121,22 @@ async function main() {
       console.log('Deleted prebuilds/ directory...');
     }
 
+    // Clean up any leftover .bak files in root better-sqlite3 build dir
+    const rootReleaseDir = path.join(__dirname, 'node_modules', 'better-sqlite3', 'build', 'Release');
+    if (fs.existsSync(rootReleaseDir)) {
+      try {
+        const files = fs.readdirSync(rootReleaseDir);
+        for (const f of files) {
+          if (f.endsWith('.bak')) {
+            try { fs.rmSync(path.join(rootReleaseDir, f), { force: true }); } catch (_) {}
+          }
+        }
+      } catch (_) {}
+    }
+
     // Rebuild better-sqlite3 inside package-staging
     console.log('Rebuilding better-sqlite3 for Electron v33.4.4 (ABI 130) inside staging directory...');
-    // Run electron-rebuild targeting staging directory as module root
-    runCommand(`npx --package=@electron/rebuild electron-rebuild -f -v 33.4.4 -m . --build-from-source --which-module better-sqlite3`, stagingDir);
+    runCommand(`npx --package=@electron/rebuild electron-rebuild -f -v 33.4.4 --only better-sqlite3 --module-dir .`, stagingDir);
 
     // Verify rebuilding succeeded and binary was created
     if (!fs.existsSync(prebuiltNode)) {
@@ -140,7 +153,7 @@ async function main() {
       electronVersion: '33.4.4',
       directories: {
         app: '.',
-        output: '../build-desktop'
+        output: path.join(__dirname, 'build-desktop')
       },
       files: [
         'dist/**/*',

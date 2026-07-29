@@ -10,8 +10,24 @@ export function initDb(userDataPath: string): Database.Database {
 
   const dbPath = path.join(dbDir, "base.db");
 
-  // If database doesn't exist in userDataPath, copy seed base.db if available
+  // Check if existing database needs employee seeding (file missing, empty, or 0 employees)
+  let needsSeed = false;
   if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size === 0) {
+    needsSeed = true;
+  } else {
+    try {
+      const checkDb = new Database(dbPath);
+      const row = checkDb.prepare("SELECT count(*) as cnt FROM employees").get() as any;
+      checkDb.close();
+      if (!row || row.cnt === 0) {
+        needsSeed = true;
+      }
+    } catch (_) {
+      needsSeed = true;
+    }
+  }
+
+  if (needsSeed) {
     const electronResources = (process as any).resourcesPath || "";
     const seedCandidates = [
       path.join(process.cwd(), "base.db"),
@@ -19,13 +35,16 @@ export function initDb(userDataPath: string): Database.Database {
       path.join(__dirname, "..", "base.db"),
       path.join(__dirname, "..", "..", "base.db"),
       path.join(electronResources, "base.db"),
-      path.join(electronResources, "app.asar.unpacked", "base.db")
+      path.join(electronResources, "app.asar.unpacked", "base.db"),
+      path.join(electronResources, "app.asar.unpacked", "dist", "base.db"),
+      path.join(electronResources, "app", "base.db")
     ];
     for (const seedPath of seedCandidates) {
       if (fs.existsSync(seedPath) && seedPath !== dbPath && fs.statSync(seedPath).size > 0) {
         try {
           fs.copyFileSync(seedPath, dbPath);
-          console.log(`✅ Initialized SQLite base.db from seed file: ${seedPath} -> ${dbPath}`);
+          console.log(`✅ Seeded SQLite base.db from seed file: ${seedPath} -> ${dbPath}`);
+          needsSeed = false;
           break;
         } catch (e) {
           console.warn("Could not copy seed base.db file:", e);

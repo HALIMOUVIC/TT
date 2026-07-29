@@ -1479,9 +1479,44 @@ ${text ? `REPORT TEXT OR CONTEXT:\n${text}` : ''}
       }
 
       const db = getDb();
-      const allEmployees = db.prepare(
+      let allEmployees = db.prepare(
         "SELECT * FROM employees"
       ).all() as any[];
+
+      // Fallback: If employees table is empty, attempt emergency seed from seed candidates
+      if (allEmployees.length === 0) {
+        console.warn("⚠️ Employees table is empty during login. Emergency seeding...");
+        const electronResources = (process as any).resourcesPath || "";
+        const seedCandidates = [
+          path.join(process.cwd(), "base.db"),
+          path.join(__dirname, "base.db"),
+          path.join(__dirname, "..", "base.db"),
+          path.join(__dirname, "..", "..", "base.db"),
+          path.join(electronResources, "base.db"),
+          path.join(electronResources, "app.asar.unpacked", "base.db"),
+          path.join(electronResources, "app.asar.unpacked", "dist", "base.db")
+        ];
+        for (const seedPath of seedCandidates) {
+          if (fs.existsSync(seedPath) && fs.statSync(seedPath).size > 0) {
+            try {
+              const seedDb = new Database(seedPath, { readonly: true });
+              const seedEmps = seedDb.prepare("SELECT * FROM employees").all() as any[];
+              seedDb.close();
+              if (seedEmps && seedEmps.length > 0) {
+                const syncEmp = db.transaction(() => {
+                  for (const e of seedEmps) upsertEmployee(e);
+                });
+                syncEmp();
+                console.log(`✅ Emergency seeded ${seedEmps.length} employees into database from ${seedPath}`);
+                allEmployees = db.prepare("SELECT * FROM employees").all() as any[];
+                break;
+              }
+            } catch (e) {
+              console.warn("Emergency seed failed from:", seedPath, e);
+            }
+          }
+        }
+      }
 
       const trimmedInput = nom_prenom.trim().toLowerCase();
       const strippedInput = trimmedInput.replace(/\s+/g, "");
