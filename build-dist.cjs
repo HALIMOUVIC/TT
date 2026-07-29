@@ -150,11 +150,19 @@ async function main() {
     }
     console.log('Rebuild verified! Native binary exists.');
 
+    // Set environment variables for electron-builder code signing with Publisher: Mirage
+    const pfxSrc = path.join(__dirname, 'mirage.pfx');
+    if (fs.existsSync(pfxSrc)) {
+      process.env.CSC_LINK = pfxSrc;
+      process.env.CSC_KEY_PASSWORD = 'Mirage123!';
+      console.log('  Digital code-signing certificate (mirage.pfx) enabled for Publisher: Mirage');
+    }
+
     // 7. Write electron-builder config inside package-staging
     const ebConfig = {
       appId: 'com.wellbore.pro',
       productName: 'Wellbore Schematic Pro',
-      copyright: 'Copyright © oh.a.halim',
+      copyright: 'Copyright © Mirage',
       npmRebuild: false,
       electronVersion: '33.4.4',
       directories: {
@@ -202,7 +210,7 @@ async function main() {
         shortcutName: 'Wellbore Schematic Pro',
         installerIcon: 'wellborePro.ico',
         uninstallerIcon: 'wellborePro.ico',
-        uninstallDisplayName: 'Wellbore Schematic Pro',
+        uninstallDisplayName: 'Wellbore Schematic Pro (Mirage)',
         artifactName: `WellboreSchematicPro Setup v${appVersion}.\${ext}`,
         runAfterFinish: false
       }
@@ -224,8 +232,9 @@ async function main() {
     if (fs.existsSync(distOutDir)) {
       const outFiles = fs.readdirSync(distOutDir);
       for (const file of outFiles) {
-        if (file !== 'win-unpacked' && file !== 'builder-debug.yml') {
-          fs.copyFileSync(path.join(distOutDir, file), path.join(finalDestDir, file));
+        const srcPath = path.join(distOutDir, file);
+        if (fs.statSync(srcPath).isFile() && file !== 'builder-debug.yml') {
+          fs.copyFileSync(srcPath, path.join(finalDestDir, file));
           console.log(`  Output copied: ${file}`);
         }
       }
